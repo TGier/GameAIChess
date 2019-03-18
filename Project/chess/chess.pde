@@ -13,6 +13,16 @@ final int GRID_SIZE = 480 / BOARD_WIDTH;
 final color LIGHT_SQUARE = color(247, 243, 195);
 final color DARK_SQUARE = color(96, 72, 5);
 
+enum PlayerType {
+  HUMAN, RANDOM, MINIMAX, MCTS
+}
+
+boolean whiteMove = true;
+PlayerType whitePlayer = PlayerType.HUMAN;
+PlayerType blackPlayer = PlayerType.RANDOM;
+ChessPiece playerSelectedPiece;
+
+
 void setup() {
   size(480, 480);
   gameBoard = new ChessBoard();
@@ -20,6 +30,25 @@ void setup() {
 
 void draw() {
   gameBoard.draw();
+  PlayerType currentActor = whiteMove ? whitePlayer : blackPlayer;
+  switch (currentActor) {
+    case HUMAN:
+      break;
+    case RANDOM:
+      gameBoard.makeRandomMove(whiteMove);
+      whiteMove = !whiteMove;
+      break;
+    case MINIMAX:
+      gameBoard.makeMinimaxMove(whiteMove);
+      whiteMove = !whiteMove;
+      break;
+    case MCTS:
+      gameBoard.makeMCTSMove(whiteMove);
+      whiteMove = !whiteMove;
+      break;
+  }
+  // TODO
+  // Check for checkmate
 }
 
 // MARK: ChessBoard
@@ -71,6 +100,18 @@ class ChessBoard {
     blackPieces.add(new Pawn(1, 5, false));
     blackPieces.add(new Pawn(1, 6, false));
     blackPieces.add(new Pawn(1, 7, false));
+  }
+  
+  void makeRandomMove(boolean whiteMove) {
+    // TODO
+  }
+  
+  void makeMinimaxMove(boolean whiteMove) {
+    // TODO
+  }
+  
+  void makeMCTSMove(boolean whiteMove) {
+    // TODO
   }
   
   int evalBoard() {
@@ -127,7 +168,15 @@ abstract class ChessPiece {
     this.img = loadImage(imgStr + ".png");
   }
   
-  abstract ArrayList<ChessPiece> getPossibleMoves(ChessBoard currentBoard);
+  // Returns the list of all squares this piece can move to
+  abstract ArrayList<Pair> getPossibleMoves(ChessBoard currentBoard);
+  
+  // Returns if this piece can capture the given chess piece if allowed to move again
+  boolean canCapture(ChessBoard board, ChessPiece other) {
+    ArrayList<Pair> moves = getPossibleMoves(board);
+    // TODO
+    return false;
+  }
   
   int getPoints() {
     return pointValue; 
@@ -143,7 +192,7 @@ class Pawn extends ChessPiece {
     super(r, c, isWhite, 1, isWhite ? "white_pawn" : "black_pawn");
   }
   
-  ArrayList<ChessPiece> getPossibleMoves(ChessBoard currentBoard) {
+  ArrayList<Pair> getPossibleMoves(ChessBoard currentBoard) {
     // TODO
     return null;
   }
@@ -154,7 +203,7 @@ class Rook extends ChessPiece {
     super(r, c, isWhite, 1, isWhite ? "white_rook" : "black_rook");
   }
   
-  ArrayList<ChessPiece> getPossibleMoves(ChessBoard currentBoard) {
+  ArrayList<Pair> getPossibleMoves(ChessBoard currentBoard) {
     // TODO
     return null;
   }
@@ -165,7 +214,7 @@ class Knight extends ChessPiece {
     super(r, c, isWhite, 1, isWhite ? "white_knight" : "black_knight");
   }
   
-  ArrayList<ChessPiece> getPossibleMoves(ChessBoard currentBoard) {
+  ArrayList<Pair> getPossibleMoves(ChessBoard currentBoard) {
     // TODO
     return null;
   }
@@ -176,7 +225,7 @@ class Bishop extends ChessPiece {
     super(r, c, isWhite, 1, isWhite ? "white_bishop" : "black_bishop");
   }
   
-  ArrayList<ChessPiece> getPossibleMoves(ChessBoard currentBoard) {
+  ArrayList<Pair> getPossibleMoves(ChessBoard currentBoard) {
     // TODO
     return null;
   }
@@ -187,7 +236,7 @@ class Queen extends ChessPiece {
     super(r, c, isWhite, 1, isWhite ? "white_queen" : "black_queen");
   }
   
-  ArrayList<ChessPiece> getPossibleMoves(ChessBoard currentBoard) {
+  ArrayList<Pair> getPossibleMoves(ChessBoard currentBoard) {
     // TODO
     return null;
   }
@@ -198,8 +247,13 @@ class King extends ChessPiece {
     super(r, c, isWhite, 1, isWhite ? "white_king" : "black_king");
   }
   
-  ArrayList<ChessPiece> getPossibleMoves(ChessBoard currentBoard) {
+  ArrayList<Pair> getPossibleMoves(ChessBoard currentBoard) {
     // TODO
     return null;
   }
+}
+
+class Pair {
+  int r;
+  int c;
 }
