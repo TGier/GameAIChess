@@ -11,8 +11,10 @@
 DRAW RULES
 - 6 repeated board states (3 pairs of board states) non-successive
 - 50 moves without advancing a pawn or capturing a piece
-- No legal moves for a player
+- No legal moves for a player, but King is not in check - CHECK (is done)
 */
+
+boolean DEBUG = false;
 
 ChessBoard gameBoard;
 final int BOARD_WIDTH = 8;
@@ -25,59 +27,80 @@ enum PlayerType {
 }
 
 boolean whiteMove = true;
+boolean gameOver = false;
 PlayerType whitePlayer = PlayerType.RANDOM;
 PlayerType blackPlayer = PlayerType.RANDOM;
 ChessPiece playerSelectedPiece;
 
-int ticksForAIDelay = 10;
-int frames;
-
 void setup() {
   size(480, 520);
+  frameRate(10);
   gameBoard = new ChessBoard();
 }
 
-void drawGameInfo() {
-  String currentMoveText = whiteMove ? "White turn" : "Black turn";
-  stroke(color(0,0,0));
-  text(currentMoveText, 20, 500);
+void drawGameStatusText(String text) { 
+  fill(color(0,0,0));
+  text(text, 20, 500);
 }
 
 void draw() {
+  if (gameOver) {
+    return;
+  }
   background(color(150, 150, 150));
   gameBoard.draw();
-  drawGameInfo();
-  frames += 1;
-  if (frames % ticksForAIDelay != 0) {
+  
+  if (!DEBUG) {
+    playMove();
+  } //<>//
+}
+
+void keyPressed() {
+ if (DEBUG) {
+   playMove();
+ }
+}
+
+void playMove() {
+  ArrayList<ChessPiece[][]> possibleBoards = gameBoard.getPossibleMoves(whiteMove);
+  String gameStatus = whiteMove ? "White turn" : "Black turn";
+  // Check for checkmate
+  System.out.println("IGNORE RIGHT BELOW HERE, CHRIS");
+  if (gameBoard.isCurrentBoardInCheck(whiteMove) && possibleBoards.isEmpty()) {
+    gameStatus = "CHECKMATE! " + (whiteMove ? "BLACK" : "WHITE") + " WINS!";
+    drawGameStatusText(gameStatus);
+    gameOver = true;
+    return;
+  } if (possibleBoards.isEmpty()) {
+    drawGameStatusText("Stalemate. No legal moves, but not in check: " + (whiteMove ? "WHITE" : "BLACK"));
+    gameOver = true;
     return;
   }
   
+  drawGameStatusText(gameStatus);
+ 
   PlayerType currentActor = whiteMove ? whitePlayer : blackPlayer;
   switch (currentActor) {
     case HUMAN:
       break;
     case RANDOM:
-      gameBoard.makeRandomMove(whiteMove);
+      gameBoard.makeRandomMove(whiteMove, possibleBoards);
       whiteMove = !whiteMove;
       break;
     case MINIMAX:
-      gameBoard.makeMinimaxMove(whiteMove);
+      gameBoard.makeMinimaxMove(whiteMove, possibleBoards);
       whiteMove = !whiteMove;
       break;
     case MCTS:
-      gameBoard.makeMCTSMove(whiteMove);
+      gameBoard.makeMCTSMove(whiteMove, possibleBoards);
       whiteMove = !whiteMove;
       break;
   }
-  // TODO
-  // Check for checkmate
-}
+  System.out.println("~~~~ turn over ~~~~");}
 
 // MARK: ChessBoard
 
 class ChessBoard {
-  ArrayList<ChessPiece> whitePieces;
-  ArrayList<ChessPiece> blackPieces;
   ChessPiece[][] board;
   
   ChessPiece whiteKing;
@@ -88,10 +111,7 @@ class ChessBoard {
   }
   
   void setupPieces() {
-    whitePieces = new ArrayList<ChessPiece>();
-    blackPieces = new ArrayList<ChessPiece>();
     board = new ChessPiece[BOARD_WIDTH][BOARD_WIDTH];
-    
     
     // White board setup
     board[7][0] = new Rook(1, true);
@@ -129,6 +149,7 @@ class ChessBoard {
     board[1][6] = new Pawn(31, false);
     board[1][7] = new Pawn(32, false);
     
+    
     whiteKing = board[7][4];
     blackKing = board[0][4];
   }
@@ -148,18 +169,30 @@ class ChessBoard {
     
     ArrayList<ChessPiece[][]> legalBoards = new ArrayList<ChessPiece[][]>();
     for (ChessPiece[][] cb : possibleBoards) {
+      // check for if the move puts our own King in check and filter out illegal moves
+      
+      Pair kingLocation = getLocationForPieceInBoard(cb, whiteMove ? whiteKing.id : blackKing.id);
+      System.out.println("KING LOCATION " + kingLocation.r + ", " + kingLocation.c);
+
       if (!isInCheck(cb, whiteMove)) {
         legalBoards.add(cb);
+      } else {
+        System.out.println("Illegal move removed");
       }
     }
     
+    System.out.println("possible moves: " + possibleBoards.size());
+    System.out.println("legal moves: " + legalBoards.size());
     return legalBoards;
   }
   
   // Returns if the King of the given player is in check
   boolean isInCheck(ChessPiece[][] chessBoard, boolean white) {
     // TODO filter any moves that have the <whiteMove> King in check
-    Pair kingLocation = getLocationForPiece(white ? whiteKing.id : blackKing.id);
+    Pair kingLocation = getLocationForPieceInBoard(chessBoard, white ? whiteKing.id : blackKing.id);
+    if (kingLocation == null) {
+      return true; //TODO filter out king captures instead?
+    }
     for (int r = 0; r < BOARD_WIDTH; r++) {
       for (int c = 0; c < BOARD_WIDTH; c++) {
         boolean enemyPieceInSpace = chessBoard[r][c] != null && chessBoard[r][c].isWhite != white;
@@ -171,53 +204,35 @@ class ChessBoard {
     return false;
   }
   
-  void makeRandomMove(boolean whiteMove) {
-    ArrayList<ChessPiece[][]> possibleBoards = getPossibleMoves(whiteMove);
-    for (int r = 0; r < BOARD_WIDTH; r++) {
-      for (int c = 0; c < BOARD_WIDTH; c++) {
-        if (board[r][c] != null && board[r][c].isWhite == whiteMove) {
-          ArrayList<ChessPiece[][]> moves = board[r][c].getPossibleMoves(this);
-          if (moves != null) {
-            possibleBoards.addAll(moves);
-          } 
-        }
-      }
-    }
-    if (possibleBoards.size() == 0) {
+  public boolean isCurrentBoardInCheck(boolean white) {
+    return isInCheck(this.board, white);
+  }
+  
+  void makeRandomMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
+    if (possibleBoards.isEmpty()) {
       String player = whiteMove ? "White" : "Black";
       System.out.println(player + " ran out of moves!");
+      //TODO stalemate!
       return;
     }
     board = possibleBoards.get((int) random(possibleBoards.size()));
   }
   
-  void makeMinimaxMove(boolean whiteMove) {
+  void makeMinimaxMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
     // TODO
   }
   
-  void makeMCTSMove(boolean whiteMove) {
+  void makeMCTSMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
     // TODO
   }
   
-  public Pair getLocationForPiece(int id) {
-    for (int r = 0; r < BOARD_WIDTH; r++) {
-      for (int c = 0; c < BOARD_WIDTH; c++) {
-        if (board[r][c] != null && board[r][c].id == id) {
-          return new Pair(r, c);
-        }
-      }
-    }
-    return null;
+  public Pair getLocationForPieceCurrentBoard(int id) {
+    return getLocationForPieceInBoard(this.board, id);
   }
   
   int evalBoard() {
     int boardScore = 0;
-    for (ChessPiece wp : whitePieces) {
-      boardScore += wp.getPoints();
-    }
-    for (ChessPiece bp : blackPieces) {
-      boardScore -= bp.getPoints();
-    }
+    // TODO
     return boardScore;
   }
   
@@ -263,7 +278,7 @@ abstract class ChessPiece {
     this.img = loadImage(imgStr + ".png");
   }
   
-  // Returns the list of all squares this piece can move to
+  // Returns the list of all squares this piece can move to (TODO - all boards?)
   abstract ArrayList<ChessPiece[][]> getPossibleMoves(ChessBoard currentBoard);
   
   // Returns if this piece can capture a piece on the given space if allowed to move again
@@ -285,7 +300,7 @@ class Pawn extends ChessPiece {
   
   ArrayList<ChessPiece[][]> getPossibleMoves(ChessBoard currentBoard) {
     ArrayList<ChessPiece[][]> possibleMoves = new ArrayList<ChessPiece[][]>();
-    Pair currentLocation = currentBoard.getLocationForPiece(this.id);
+    Pair currentLocation = currentBoard.getLocationForPieceCurrentBoard(this.id);
     int r = currentLocation.r;
     int c = currentLocation.c;
     boolean firstMove = (isWhite && r == 6) || (!isWhite && r == 1);
@@ -374,18 +389,25 @@ class Pawn extends ChessPiece {
         possibleMoves.add(queenPromotion);
       }
     }
-    // TODO En passante?
+    // TODO En passant?
     
     return possibleMoves;
   }
   
   boolean threatensSpace(ChessPiece[][] board, Pair space) {
-    Pair mySpace = getPieceLocationInBoard(board, this.id);
+    Pair mySpace = getLocationForPieceInBoard(board, this.id);
     if (isWhite) {
-      return space.r == mySpace.r - 1 && Math.abs(mySpace.c - space.c) == 1;
+      if(space.r == mySpace.r - 1 && Math.abs(mySpace.c - space.c) == 1) {
+        System.out.println("Pawn threatens space " + space.r + "," + space.c);
+        return true;
+      }
     } else {
-      return space.r == mySpace.r + 1 && Math.abs(mySpace.c - space.c) == 1;
+      if(space.r == mySpace.r + 1 && Math.abs(mySpace.c - space.c) == 1) {
+        System.out.println("Pawn threatens space " + space.r + "," + space.c);
+        return true;
+      }
     }
+    return false;
   }
 }
 
@@ -395,15 +417,158 @@ class Rook extends ChessPiece {
   }
   
   ArrayList<ChessPiece[][]> getPossibleMoves(ChessBoard currentBoard) {
-    // TODO
-    return null;
+    ArrayList<ChessPiece[][]> possibleMoves = new ArrayList<ChessPiece[][]>();
+    Pair currentLocation = currentBoard.getLocationForPieceCurrentBoard(this.id);
+    int r = currentLocation.r;
+    int c = currentLocation.c;
+    ChessPiece[][] boardWithoutPiece = copyBoard(currentBoard.board);
+    boardWithoutPiece[r][c] = null;
+    
+    // while loop to check up, down, left and right
+    int rUp = r-1;
+    while (rUp >= 0) {
+      ChessPiece pieceInSpace = boardWithoutPiece[rUp][c];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveUp = copyBoard(boardWithoutPiece);
+      moveUp[rUp][c] = this;
+      possibleMoves.add(moveUp);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      rUp -= 1;
+    }
+    
+    int rDown = r+1;
+    while (rDown < BOARD_WIDTH) {
+      ChessPiece pieceInSpace = boardWithoutPiece[rDown][c];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveDown = copyBoard(boardWithoutPiece);
+      moveDown[rDown][c] = this;
+      possibleMoves.add(moveDown);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      rDown += 1;
+    }
+    
+    int cLeft = c-1;
+    while (cLeft >= 0) {
+      ChessPiece pieceInSpace = boardWithoutPiece[r][cLeft];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveLeft = copyBoard(boardWithoutPiece);
+      moveLeft[r][cLeft] = this;
+      possibleMoves.add(moveLeft);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      cLeft -= 1;
+    }
+    int cRight = c+1;
+    while (cRight < BOARD_WIDTH) {
+      ChessPiece pieceInSpace = boardWithoutPiece[r][cRight];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveRight = copyBoard(boardWithoutPiece);
+      moveRight[r][cRight] = this;
+      possibleMoves.add(moveRight);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      cRight += 1;
+    }
+    
+    return possibleMoves;
   }
   
   boolean threatensSpace(ChessPiece[][] board, Pair space) {
-    // TODO
+    Pair mySpace = getLocationForPieceInBoard(board, this.id);
+    if (mySpace.r != space.r && mySpace.c != space.c) {
+      return false;
+    }
+    
+    if (mySpace.r == space.r) {
+      // check columns in between for emptiness
+      if(emptyBetweenRow(board, mySpace, space)){
+        System.out.println("Rook threatens space " + space.r + "," + space.c);
+        return true;
+      }
+    } 
+    else if (mySpace.c == space.c) {
+      // check rows in between for emptiness
+      if(emptyBetweenColumn(board, mySpace, space)) {
+        System.out.println("Rook threatens space " + space.r + "," + space.c);
+        return true;
+      }
+    }
+    
     return false;
   }
 }
+
+public boolean emptyBetweenColumn(ChessPiece[][] board, Pair spaceA, Pair spaceB) {
+  if (spaceA.c != spaceB.c) {
+    //System.out.println("emptyBetweenColumn: Column not equal!");
+    return false;
+  }
+  
+  int startR = min(spaceA.r, spaceB.r);
+  int endR = max(spaceA.r, spaceB.r);
+  
+  for (int i = startR + 1; i < endR; i++) {
+    if (board[i][spaceA.c] != null) {
+      return false;
+    }
+  }
+  return true;
+} //TODO move
+
+public boolean emptyBetweenRow(ChessPiece[][] board, Pair spaceA, Pair spaceB) {
+  if (spaceA.r != spaceB.r) {
+    //System.out.println("emptyBetweenRow: Row not equal!");
+    return false;
+  }
+  
+  int startC = min(spaceA.c, spaceB.c);
+  int endC = max(spaceA.c, spaceB.c);
+  
+  for (int i = startC + 1; i < endC; i++) {
+    if (board[spaceA.r][i] != null) {
+      return false;
+    }
+  }
+  return true;
+} //TODO move
 
 class Knight extends ChessPiece {
   Knight(int id, boolean isWhite) {
@@ -412,7 +577,7 @@ class Knight extends ChessPiece {
   
   ArrayList<ChessPiece[][]> getPossibleMoves(ChessBoard currentBoard) {
     ArrayList<ChessPiece[][]> possibleMoves = new ArrayList<ChessPiece[][]>();
-    Pair currentLocation = currentBoard.getLocationForPiece(this.id);
+    Pair currentLocation = currentBoard.getLocationForPieceCurrentBoard(this.id);
     int r = currentLocation.r;
     int c = currentLocation.c;
     ChessPiece[][] boardWithoutPiece = copyBoard(currentBoard.board);
@@ -442,15 +607,15 @@ class Knight extends ChessPiece {
         }
       }
     }
-    return null;
+    return possibleMoves;
   }
   
   boolean threatensSpace(ChessPiece[][] board, Pair space) {
-    Pair mySpace = getPieceLocationInBoard(board, this.id);
+    Pair mySpace = getLocationForPieceInBoard(board, this.id);
     for (int x = 1; x < 3; x++) {
       for (int y = 1; y < 3; y++) {
         if (x == y) {
-        continue;
+          continue;
         }
         // +x/+y, +x/-y, -x/+y, -x/-y
         for (int j = -1; j <= 1; j++) {
@@ -461,6 +626,7 @@ class Knight extends ChessPiece {
             int newR = mySpace.r + (x * j);
             int newC = mySpace.c + (y * k);
             if (newR == space.r && newC == space.c) {
+              System.out.println("Knight threatens space " + newR + "," + newC); 
               return true;
             }
           }
@@ -477,15 +643,178 @@ class Bishop extends ChessPiece {
   }
   
   ArrayList<ChessPiece[][]> getPossibleMoves(ChessBoard currentBoard) {
-    // TODO
-    return null;
+    ArrayList<ChessPiece[][]> possibleMoves = new ArrayList<ChessPiece[][]>();
+    Pair currentLocation = currentBoard.getLocationForPieceCurrentBoard(this.id);
+    int r = currentLocation.r;
+    int c = currentLocation.c;
+    ChessPiece[][] boardWithoutPiece = copyBoard(currentBoard.board);
+    boardWithoutPiece[r][c] = null;
+    
+    // while loop to check up-left, up-right, down-left, down-right
+    int rUp = r-1;
+    int cLeft = c-1;
+    while (rUp >= 0 && cLeft >= 0) {
+      ChessPiece pieceInSpace = boardWithoutPiece[rUp][cLeft];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveUp = copyBoard(boardWithoutPiece);
+      moveUp[rUp][cLeft] = this;
+      possibleMoves.add(moveUp);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      rUp -= 1;
+      cLeft -= 1;
+    }
+    
+    rUp = r-1;
+    int cRight = c+1;
+    while (rUp >= 0 && cRight < BOARD_WIDTH) {
+      ChessPiece pieceInSpace = boardWithoutPiece[rUp][cRight];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveUp = copyBoard(boardWithoutPiece);
+      moveUp[rUp][cRight] = this;
+      possibleMoves.add(moveUp);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      rUp -= 1;
+      cRight += 1;
+    }
+    
+    int rDown = r+1;
+    cLeft = c-1;
+    while (rDown < BOARD_WIDTH && cLeft >= 0) {
+      ChessPiece pieceInSpace = boardWithoutPiece[rDown][cLeft];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveUp = copyBoard(boardWithoutPiece);
+      moveUp[rDown][cLeft] = this;
+      possibleMoves.add(moveUp);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      rDown += 1;
+      cLeft -= 1;
+    }
+    
+    rDown = r+1;
+    cRight = c+1;
+    while (rDown < BOARD_WIDTH && cRight < BOARD_WIDTH) {
+      ChessPiece pieceInSpace = boardWithoutPiece[rDown][cRight];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveUp = copyBoard(boardWithoutPiece);
+      moveUp[rDown][cRight] = this;
+      possibleMoves.add(moveUp);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      rDown += 1;
+      cRight += 1;
+    }
+    
+    return possibleMoves;
   }
   
   boolean threatensSpace(ChessPiece[][] board, Pair space) {
-    // TODO
+    Pair mySpace = getLocationForPieceInBoard(board, this.id);
+    if(emptyBetweenDiagonal(board, mySpace, space)) {
+      System.out.println("Bishop threatens space " + space.r + "," + space.c);
+      return true;
+    }
     return false;
   }
 }
+
+public boolean emptyBetweenDiagonal(ChessPiece[][] board, Pair spaceA, Pair spaceB) {
+  if (Math.abs(spaceA.r - spaceB.r) != Math.abs(spaceA.c - spaceB.c)) {
+      //System.out.println("emptyBetweenDiagonal: Not a straight line diagonal!");
+      return false;
+  }
+
+  //down
+  if (spaceA.r < spaceB.r) {
+    // down left
+    if (spaceA.c > spaceB.c) {
+      int curR = spaceA.r + 1;
+      int curC = spaceA.c - 1;
+      while (curR < spaceB.r && curC > spaceB.c) {
+        if (board[curR][curC] != null) {
+          return false;
+        }
+        curR += 1;
+        curC -= 1;
+      }
+    }
+    else { // down right
+      int curR = spaceA.r + 1;
+      int curC = spaceA.c + 1;
+      while (curR < spaceB.r && curC < spaceB.c) {
+        if (board[curR][curC] != null) {
+          return false;
+        }
+        curR += 1;
+        curC += 1;
+      }
+    }
+  }
+  else { //up 
+    // up left
+    if (spaceA.c > spaceB.c) {
+      int curR = spaceA.r - 1;
+      int curC = spaceA.c - 1;
+      while (curR > spaceB.r && curC > spaceB.c) {
+        if (board[curR][curC] != null) {
+          return false;
+        }
+        curR -= 1;
+        curC -= 1;
+      }
+    }
+    else { // up right
+      int curR = spaceA.r - 1;
+      int curC = spaceA.c + 1;
+      while (curR > spaceB.r && curC < spaceB.c) {
+        if (board[curR][curC] != null) {
+          return false;
+        }
+        curR -= 1;
+        curC += 1;
+      }
+    }
+  }
+  return true;
+} //TODO move
 
 class Queen extends ChessPiece {
   Queen(int id, boolean isWhite) {
@@ -493,12 +822,219 @@ class Queen extends ChessPiece {
   }
   
   ArrayList<ChessPiece[][]> getPossibleMoves(ChessBoard currentBoard) {
-    // TODO, combine logic from bishop and rook
-    return null;
+    ArrayList<ChessPiece[][]> possibleMoves = new ArrayList<ChessPiece[][]>();
+    Pair currentLocation = currentBoard.getLocationForPieceCurrentBoard(this.id);
+    int r = currentLocation.r;
+    int c = currentLocation.c;
+    ChessPiece[][] boardWithoutPiece = copyBoard(currentBoard.board);
+    boardWithoutPiece[r][c] = null;
+    
+    // Check moving like a rook
+    int rUp = r-1;
+    while (rUp >= 0) {
+      ChessPiece pieceInSpace = boardWithoutPiece[rUp][c];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveUp = copyBoard(boardWithoutPiece);
+      moveUp[rUp][c] = this;
+      possibleMoves.add(moveUp);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      rUp -= 1;
+    }
+    
+    int rDown = r+1;
+    while (rDown < BOARD_WIDTH) {
+      ChessPiece pieceInSpace = boardWithoutPiece[rDown][c];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveDown = copyBoard(boardWithoutPiece);
+      moveDown[rDown][c] = this;
+      possibleMoves.add(moveDown);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      rDown += 1;
+    }
+    
+    int cLeft = c-1;
+    while (cLeft >= 0) {
+      ChessPiece pieceInSpace = boardWithoutPiece[r][cLeft];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveLeft = copyBoard(boardWithoutPiece);
+      moveLeft[r][cLeft] = this;
+      possibleMoves.add(moveLeft);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      cLeft -= 1;
+    }
+    int cRight = c+1;
+    while (cRight < BOARD_WIDTH) {
+      ChessPiece pieceInSpace = boardWithoutPiece[r][cRight];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveRight = copyBoard(boardWithoutPiece);
+      moveRight[r][cRight] = this;
+      possibleMoves.add(moveRight);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      cRight += 1;
+    }
+    
+    // Check bishop moves
+    // while loop to check up-left, up-right, down-left, down-right
+    rUp = r-1;
+    cLeft = c-1;
+    while (rUp >= 0 && cLeft >= 0) {
+      ChessPiece pieceInSpace = boardWithoutPiece[rUp][cLeft];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveUp = copyBoard(boardWithoutPiece);
+      moveUp[rUp][cLeft] = this;
+      possibleMoves.add(moveUp);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      rUp -= 1;
+      cLeft -= 1;
+    }
+    
+    rUp = r-1;
+    cRight = c+1;
+    while (rUp >= 0 && cRight < BOARD_WIDTH) {
+      ChessPiece pieceInSpace = boardWithoutPiece[rUp][cRight];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveUp = copyBoard(boardWithoutPiece);
+      moveUp[rUp][cRight] = this;
+      possibleMoves.add(moveUp);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      rUp -= 1;
+      cRight += 1;
+    }
+    
+    rDown = r+1;
+    cLeft = c-1;
+    while (rDown < BOARD_WIDTH && cLeft >= 0) {
+      ChessPiece pieceInSpace = boardWithoutPiece[rDown][cLeft];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveUp = copyBoard(boardWithoutPiece);
+      moveUp[rDown][cLeft] = this;
+      possibleMoves.add(moveUp);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      rDown += 1;
+      cLeft -= 1;
+    }
+    
+    rDown = r+1;
+    cRight = c+1;
+    while (rDown < BOARD_WIDTH && cRight < BOARD_WIDTH) {
+      ChessPiece pieceInSpace = boardWithoutPiece[rDown][cRight];
+      // If ally in space, stop
+      if (pieceInSpace != null && pieceInSpace.isWhite == this.isWhite) {
+        break;
+      } 
+      
+      // Else can move to that space
+      ChessPiece[][] moveUp = copyBoard(boardWithoutPiece);
+      moveUp[rDown][cRight] = this;
+      possibleMoves.add(moveUp);
+      
+      // If we captured an enemy, stop
+      if (pieceInSpace != null) {
+        break;
+      }
+      // Else get next space
+      rDown += 1;
+      cRight += 1;
+    }
+    
+    return possibleMoves;
   }
   
   boolean threatensSpace(ChessPiece[][] board, Pair space) {
-    // TODO, combine logic from bishop and rook
+    Pair mySpace = getLocationForPieceInBoard(board, this.id);
+    
+    if (mySpace.r == space.r) {
+      // check columns in between for emptiness
+      if(emptyBetweenRow(board, mySpace, space)) {
+        System.out.println("Queen threatens space " + space.r + "," + space.c);
+        return true;
+      }
+    } 
+    else if (mySpace.c == space.c) {
+      // check rows in between for emptiness
+      System.out.println("Queen threatens space " + space.r + "," + space.c);
+      if(emptyBetweenColumn(board, mySpace, space)) {
+        System.out.println("Queen threatens space " + space.r + "," + space.c);
+        return true;
+      }
+    }
+    else {
+      System.out.println("Queen threatens space " + space.r + "," + space.c);
+      if (emptyBetweenDiagonal(board, mySpace, space)) {
+        System.out.println("Queen threatens space " + space.r + "," + space.c);
+        return true;
+      }
+    }
     return false;
   }
 }
@@ -510,7 +1046,7 @@ class King extends ChessPiece {
   
   ArrayList<ChessPiece[][]> getPossibleMoves(ChessBoard currentBoard) {
     ArrayList<ChessPiece[][]> possibleMoves = new ArrayList<ChessPiece[][]>();
-    Pair currentLocation = currentBoard.getLocationForPiece(this.id);
+    Pair currentLocation = currentBoard.getLocationForPieceCurrentBoard(this.id);
     int r = currentLocation.r;
     int c = currentLocation.c;
     ChessPiece[][] boardWithoutPiece = copyBoard(currentBoard.board);
@@ -538,8 +1074,12 @@ class King extends ChessPiece {
   }
   
   boolean threatensSpace(ChessPiece[][] board, Pair space) {
-    Pair mySpace = getPieceLocationInBoard(board, this.id);
-    return Math.abs(space.r - mySpace.r) <= 1 && Math.abs(space.c - mySpace.c) <= 1;
+    Pair mySpace = getLocationForPieceInBoard(board, this.id);
+    if (Math.abs(space.r - mySpace.r) <= 1 && Math.abs(space.c - mySpace.c) <= 1) {
+      System.out.println("King threatens space " + space.r + "," + space.c);
+      return true;
+    }
+    return false;
   }
 }
 
@@ -564,7 +1104,7 @@ ChessPiece[][] copyBoard(ChessPiece[][] board) {
   return copy;
 }
 
-Pair getPieceLocationInBoard(ChessPiece[][] board, int id) {
+Pair getLocationForPieceInBoard(ChessPiece[][] board, int id) {
   for (int r = 0; r < BOARD_WIDTH; r++) {
     for (int c = 0; c < BOARD_WIDTH; c++) {
       if (board[r][c] != null && board[r][c].id == id) {
@@ -572,5 +1112,7 @@ Pair getPieceLocationInBoard(ChessPiece[][] board, int id) {
       }
     }
   }
+  
+  System.out.println("PIECE NOT IN BOARD WITH ID " + id);
   return null;
 }
