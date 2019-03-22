@@ -28,14 +28,17 @@ enum PlayerType {
 
 boolean whiteMove = true;
 boolean gameOver = false;
-PlayerType whitePlayer = PlayerType.RANDOM;
+PlayerType whitePlayer = PlayerType.HUMAN;
 PlayerType blackPlayer = PlayerType.RANDOM;
 ChessPiece playerSelectedPiece;
+ArrayList<ChessPiece[][]> playerLegalMoves;
+ArrayList<Pair> squareHighlights;
 
 void setup() {
   size(480, 520);
-  frameRate(10);
+  frameRate(60);
   gameBoard = new ChessBoard();
+  squareHighlights = new ArrayList<Pair>();
 }
 
 void drawGameStatusText(String text) { 
@@ -65,7 +68,7 @@ void playMove() {
   ArrayList<ChessPiece[][]> possibleBoards = gameBoard.getPossibleMoves(whiteMove);
   String gameStatus = whiteMove ? "White turn" : "Black turn";
   // Check for checkmate
-  System.out.println("IGNORE RIGHT BELOW HERE, CHRIS");
+  //System.out.println("IGNORE RIGHT BELOW HERE, CHRIS");
   if (gameBoard.isCurrentBoardInCheck(whiteMove) && possibleBoards.isEmpty()) {
     gameStatus = "CHECKMATE! " + (whiteMove ? "BLACK" : "WHITE") + " WINS!";
     drawGameStatusText(gameStatus);
@@ -82,6 +85,7 @@ void playMove() {
   PlayerType currentActor = whiteMove ? whitePlayer : blackPlayer;
   switch (currentActor) {
     case HUMAN:
+      checkHumanInput();
       break;
     case RANDOM:
       gameBoard.makeRandomMove(whiteMove, possibleBoards);
@@ -96,7 +100,40 @@ void playMove() {
       whiteMove = !whiteMove;
       break;
   }
-  System.out.println("~~~~ turn over ~~~~");}
+  //System.out.println("~~~~ turn over ~~~~");
+}
+
+void checkHumanInput() {
+  if (!mousePressed || (mousePressed && mouseY > 480)) {
+    return;
+  }
+  
+  int row = mouseY / GRID_SIZE;
+  int col = mouseX / GRID_SIZE;
+  System.out.println("PLAYER CLICKED: (" + row + ", " + col + ")");
+  ChessPiece clickedPiece = gameBoard.getPiece(row, col, whiteMove);
+  if (clickedPiece != null) {
+    playerSelectedPiece = clickedPiece;
+    playerLegalMoves = gameBoard.getLegalMovesForPiece(playerSelectedPiece);
+    squareHighlights.clear();
+    for (ChessPiece[][] b : playerLegalMoves) {
+      squareHighlights.add(getLocationForPieceInBoard(b, playerSelectedPiece.id));
+    }
+    System.out.println("Selected piece @ (" + row + ", " + col + ")");
+  }
+  
+  for (ChessPiece[][] cb : playerLegalMoves) {
+    if (cb[row][col] != null && cb[row][col].id == playerSelectedPiece.id) {
+      gameBoard.setBoard(cb);
+      whiteMove = !whiteMove; 
+      playerSelectedPiece = null;
+      playerLegalMoves.clear();
+      squareHighlights.clear();
+      System.out.println("Moved selected piece to (" + row + ", " + col + ")");
+      return;
+    }
+  } 
+}
 
 // MARK: ChessBoard
 
@@ -154,6 +191,31 @@ class ChessBoard {
     blackKing = board[0][4];
   }
   
+  ChessPiece getPiece(int r, int c, boolean isWhite) {
+    ChessPiece p = board[r][c];
+    if (p != null && p.isWhite == isWhite) {
+      return p;
+    }
+    return null;
+  }
+  
+  void setBoard(ChessPiece[][] newBoard) {
+    // TODO reset stalemate conditions?
+    board = newBoard;
+  }
+  
+  ArrayList<ChessPiece[][]> getLegalMovesForPiece(ChessPiece cp) {
+    ArrayList<ChessPiece[][]> possibleBoards = cp.getPossibleMoves(this);
+    ArrayList<ChessPiece[][]> legalBoards = new ArrayList<ChessPiece[][]>();
+    for (ChessPiece[][] cb : possibleBoards) {
+      // check for if the move puts our own King in check and filter out illegal moves
+      if (!isInCheck(cb, whiteMove)) {
+        legalBoards.add(cb);
+      }
+    }
+    return legalBoards;
+  }
+  
   ArrayList<ChessPiece[][]> getPossibleMoves(boolean whiteMove) {
     ArrayList<ChessPiece[][]> possibleBoards = new ArrayList<ChessPiece[][]>();
     for (int r = 0; r < BOARD_WIDTH; r++) {
@@ -170,19 +232,10 @@ class ChessBoard {
     ArrayList<ChessPiece[][]> legalBoards = new ArrayList<ChessPiece[][]>();
     for (ChessPiece[][] cb : possibleBoards) {
       // check for if the move puts our own King in check and filter out illegal moves
-      
-      Pair kingLocation = getLocationForPieceInBoard(cb, whiteMove ? whiteKing.id : blackKing.id);
-      System.out.println("KING LOCATION " + kingLocation.r + ", " + kingLocation.c);
-
       if (!isInCheck(cb, whiteMove)) {
         legalBoards.add(cb);
-      } else {
-        System.out.println("Illegal move removed");
       }
     }
-    
-    System.out.println("possible moves: " + possibleBoards.size());
-    System.out.println("legal moves: " + legalBoards.size());
     return legalBoards;
   }
   
@@ -211,7 +264,7 @@ class ChessBoard {
   void makeRandomMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
     if (possibleBoards.isEmpty()) {
       String player = whiteMove ? "White" : "Black";
-      System.out.println(player + " ran out of moves!");
+      //System.out.println(player + " ran out of moves!");
       //TODO stalemate!
       return;
     }
@@ -238,7 +291,11 @@ class ChessBoard {
   
   void draw() {
     drawBoard();
-    // TODO color squares of valid moves for player?
+    for (Pair sq : squareHighlights) {
+      stroke(0);
+      fill(129, 169, 234);
+      rect(sq.c * GRID_SIZE, sq.r * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+    }
     for (int r = 0; r < BOARD_WIDTH; r++) {
       for (int c = 0; c < BOARD_WIDTH; c++) {
         if (board[r][c] != null) {
@@ -340,6 +397,7 @@ class Pawn extends ChessPiece {
     if (firstMove && boardWithoutPiece[movingRow][c] == null && boardWithoutPiece[twoSpaceMoveRow][c] == null) {
       ChessPiece[][] twoSpaceMove = copyBoard(boardWithoutPiece);
       twoSpaceMove[twoSpaceMoveRow][c] = this;
+      possibleMoves.add(twoSpaceMove);
     }
       
     // Left capture
@@ -398,12 +456,12 @@ class Pawn extends ChessPiece {
     Pair mySpace = getLocationForPieceInBoard(board, this.id);
     if (isWhite) {
       if(space.r == mySpace.r - 1 && Math.abs(mySpace.c - space.c) == 1) {
-        System.out.println("Pawn threatens space " + space.r + "," + space.c);
+        //System.out.println("Pawn threatens space " + space.r + "," + space.c);
         return true;
       }
     } else {
       if(space.r == mySpace.r + 1 && Math.abs(mySpace.c - space.c) == 1) {
-        System.out.println("Pawn threatens space " + space.r + "," + space.c);
+        //System.out.println("Pawn threatens space " + space.r + "," + space.c);
         return true;
       }
     }
@@ -520,14 +578,14 @@ class Rook extends ChessPiece {
     if (mySpace.r == space.r) {
       // check columns in between for emptiness
       if(emptyBetweenRow(board, mySpace, space)){
-        System.out.println("Rook threatens space " + space.r + "," + space.c);
+        //System.out.println("Rook threatens space " + space.r + "," + space.c);
         return true;
       }
     } 
     else if (mySpace.c == space.c) {
       // check rows in between for emptiness
       if(emptyBetweenColumn(board, mySpace, space)) {
-        System.out.println("Rook threatens space " + space.r + "," + space.c);
+        //System.out.println("Rook threatens space " + space.r + "," + space.c);
         return true;
       }
     }
@@ -538,7 +596,7 @@ class Rook extends ChessPiece {
 
 public boolean emptyBetweenColumn(ChessPiece[][] board, Pair spaceA, Pair spaceB) {
   if (spaceA.c != spaceB.c) {
-    //System.out.println("emptyBetweenColumn: Column not equal!");
+    ////System.out.println("emptyBetweenColumn: Column not equal!");
     return false;
   }
   
@@ -555,7 +613,7 @@ public boolean emptyBetweenColumn(ChessPiece[][] board, Pair spaceA, Pair spaceB
 
 public boolean emptyBetweenRow(ChessPiece[][] board, Pair spaceA, Pair spaceB) {
   if (spaceA.r != spaceB.r) {
-    //System.out.println("emptyBetweenRow: Row not equal!");
+    ////System.out.println("emptyBetweenRow: Row not equal!");
     return false;
   }
   
@@ -626,7 +684,7 @@ class Knight extends ChessPiece {
             int newR = mySpace.r + (x * j);
             int newC = mySpace.c + (y * k);
             if (newR == space.r && newC == space.c) {
-              System.out.println("Knight threatens space " + newR + "," + newC); 
+              //System.out.println("Knight threatens space " + newR + "," + newC); 
               return true;
             }
           }
@@ -749,7 +807,7 @@ class Bishop extends ChessPiece {
   boolean threatensSpace(ChessPiece[][] board, Pair space) {
     Pair mySpace = getLocationForPieceInBoard(board, this.id);
     if(emptyBetweenDiagonal(board, mySpace, space)) {
-      System.out.println("Bishop threatens space " + space.r + "," + space.c);
+      //System.out.println("Bishop threatens space " + space.r + "," + space.c);
       return true;
     }
     return false;
@@ -758,7 +816,7 @@ class Bishop extends ChessPiece {
 
 public boolean emptyBetweenDiagonal(ChessPiece[][] board, Pair spaceA, Pair spaceB) {
   if (Math.abs(spaceA.r - spaceB.r) != Math.abs(spaceA.c - spaceB.c)) {
-      //System.out.println("emptyBetweenDiagonal: Not a straight line diagonal!");
+      ////System.out.println("emptyBetweenDiagonal: Not a straight line diagonal!");
       return false;
   }
 
@@ -1016,22 +1074,22 @@ class Queen extends ChessPiece {
     if (mySpace.r == space.r) {
       // check columns in between for emptiness
       if(emptyBetweenRow(board, mySpace, space)) {
-        System.out.println("Queen threatens space " + space.r + "," + space.c);
+        //System.out.println("Queen threatens space " + space.r + "," + space.c);
         return true;
       }
     } 
     else if (mySpace.c == space.c) {
       // check rows in between for emptiness
-      System.out.println("Queen threatens space " + space.r + "," + space.c);
+      //System.out.println("Queen threatens space " + space.r + "," + space.c);
       if(emptyBetweenColumn(board, mySpace, space)) {
-        System.out.println("Queen threatens space " + space.r + "," + space.c);
+        //System.out.println("Queen threatens space " + space.r + "," + space.c);
         return true;
       }
     }
     else {
-      System.out.println("Queen threatens space " + space.r + "," + space.c);
+      //System.out.println("Queen threatens space " + space.r + "," + space.c);
       if (emptyBetweenDiagonal(board, mySpace, space)) {
-        System.out.println("Queen threatens space " + space.r + "," + space.c);
+        //System.out.println("Queen threatens space " + space.r + "," + space.c);
         return true;
       }
     }
@@ -1076,7 +1134,7 @@ class King extends ChessPiece {
   boolean threatensSpace(ChessPiece[][] board, Pair space) {
     Pair mySpace = getLocationForPieceInBoard(board, this.id);
     if (Math.abs(space.r - mySpace.r) <= 1 && Math.abs(space.c - mySpace.c) <= 1) {
-      System.out.println("King threatens space " + space.r + "," + space.c);
+      //System.out.println("King threatens space " + space.r + "," + space.c);
       return true;
     }
     return false;
