@@ -1,4 +1,6 @@
 class King extends ChessPiece {
+  boolean hasMoved = false;
+  
   King(int id, boolean isWhite) {
     super(id, isWhite, 1, isWhite ? "white_king" : "black_king");
   }
