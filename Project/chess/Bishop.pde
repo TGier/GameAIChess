@@ -110,7 +110,6 @@ class Bishop extends ChessPiece {
   boolean threatensSpace(ChessPiece[][] board, Pair space) {
     Pair mySpace = getLocationForPieceInBoard(board, this.id);
     if(ChessUtils.emptyBetweenDiagonal(board, mySpace, space)) {
-      //System.out.println("Bishop threatens space " + space.r + "," + space.c);
       return true;
     }
     return false;

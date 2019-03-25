@@ -27,9 +27,9 @@ enum PlayerType {
 
 // TO CHANGE PLAYER TYPES, MODIFY THESE VALUES USING THE ENUMS
 PlayerType whitePlayer = PlayerType.HUMAN;
-PlayerType blackPlayer = PlayerType.RANDOM;
+PlayerType blackPlayer = PlayerType.HUMAN;
 
-// Game logic valuse
+// Game logic values
 ChessBoard gameBoard;
 boolean whiteMove = true;
 boolean gameOver = false;
@@ -93,7 +93,7 @@ void drawGameStatusText(String text) {
 void drawPromotionSelect() {
   fill(color(0,0,0));
   textSize(12);
-  text("Player Promotion:", 140, 530);
+  text("Player Promotion:", 135, 530);
   for (int i = 0; i < promotionPieces.size(); i++) {
     ChessPiece piece = promotionPieces.get(i);
     int xPos = 240 + (GRID_SIZE * i);
@@ -122,8 +122,6 @@ void playMove() {
   } else if (inCheck) {
     gameStatus = (whiteMove ? "White move" : "Black move") + ", IN CHECK!";
   }
-  
-  drawGameStatusText(gameStatus);
  
   PlayerType currentActor = whiteMove ? whitePlayer : blackPlayer;
   switch (currentActor) {
@@ -196,7 +194,6 @@ public Pair getLocationForPieceInBoard(ChessPiece[][] board, int id) {
   System.out.println("PIECE NOT IN BOARD WITH ID " + id);
   return null;
 }
-
 
 public class Pair {
   int r;

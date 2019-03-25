@@ -11,6 +11,7 @@ class Knight extends ChessPiece {
     ChessPiece[][] boardWithoutPiece = ChessUtils.copyBoard(currentBoard.board);
     boardWithoutPiece[r][c] = null;
     
+    // TODO might be generating duplicate moves? Shouldn't matter, but may need to address for optimization
     for (int x = 1; x < 3; x++) {
       for (int y = 1; y < 3; y++) {
         if (x == y) {
@@ -54,7 +55,6 @@ class Knight extends ChessPiece {
             int newR = mySpace.r + (x * j);
             int newC = mySpace.c + (y * k);
             if (newR == space.r && newC == space.c) {
-              //System.out.println("Knight threatens space " + newR + "," + newC); 
               return true;
             }
           }

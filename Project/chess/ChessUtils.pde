@@ -11,6 +11,7 @@ static class ChessUtils {
     return copy;
   }
   
+  // Returns if two spaces in the same COLUMN have only empty rows between them
   public static boolean emptyBetweenColumn(ChessPiece[][] board, Pair spaceA, Pair spaceB) {
     if (spaceA.c != spaceB.c) {
       return false;
@@ -27,6 +28,7 @@ static class ChessUtils {
     return true;
   }
   
+  // Returns if two spaces in the same ROW have only empty columns between them
   public static boolean emptyBetweenRow(ChessPiece[][] board, Pair spaceA, Pair spaceB) {
     if (spaceA.r != spaceB.r) {
       return false;

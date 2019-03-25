@@ -107,14 +107,12 @@ class Rook extends ChessPiece {
     if (mySpace.r == space.r) {
       // check columns in between for emptiness
       if(ChessUtils.emptyBetweenRow(board, mySpace, space)){
-        //System.out.println("Rook threatens space " + space.r + "," + space.c);
         return true;
       }
     } 
     else if (mySpace.c == space.c) {
       // check rows in between for emptiness
       if(ChessUtils.emptyBetweenColumn(board, mySpace, space)) {
-        //System.out.println("Rook threatens space " + space.r + "," + space.c);
         return true;
       }
     }

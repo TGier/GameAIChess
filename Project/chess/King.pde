@@ -30,14 +30,13 @@ class King extends ChessPiece {
       }
     }
     
-    // TODO castling?
+    // TODO castling? Stretch goal, "edge case" move
     return possibleMoves;
   }
   
   boolean threatensSpace(ChessPiece[][] board, Pair space) {
     Pair mySpace = getLocationForPieceInBoard(board, this.id);
     if (Math.abs(space.r - mySpace.r) <= 1 && Math.abs(space.c - mySpace.c) <= 1) {
-      //System.out.println("King threatens space " + space.r + "," + space.c);
       return true;
     }
     return false;

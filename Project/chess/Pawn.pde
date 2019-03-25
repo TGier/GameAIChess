@@ -104,12 +104,10 @@ class Pawn extends ChessPiece {
     Pair mySpace = getLocationForPieceInBoard(board, this.id);
     if (isWhite) {
       if(space.r == mySpace.r - 1 && Math.abs(mySpace.c - space.c) == 1) {
-        //System.out.println("Pawn threatens space " + space.r + "," + space.c);
         return true;
       }
     } else {
       if(space.r == mySpace.r + 1 && Math.abs(mySpace.c - space.c) == 1) {
-        //System.out.println("Pawn threatens space " + space.r + "," + space.c);
         return true;
       }
     }
