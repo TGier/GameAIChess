@@ -28,22 +28,32 @@ enum PlayerType {
 
 boolean whiteMove = true;
 boolean gameOver = false;
+String gameStatus = whiteMove ? "White turn" : "Black turn";
 PlayerType whitePlayer = PlayerType.HUMAN;
 PlayerType blackPlayer = PlayerType.RANDOM;
 ChessPiece playerSelectedPiece;
 ArrayList<ChessPiece[][]> playerLegalMoves;
 ArrayList<Pair> squareHighlights;
+ChessPiece promotionPiece;
+ArrayList<ChessPiece> promotionPieces;
 
 void setup() {
-  size(480, 520);
-  frameRate(60);
+  size(480, 540);
+  frameRate(30);
   gameBoard = new ChessBoard();
   squareHighlights = new ArrayList<Pair>();
+  
+  promotionPieces = new ArrayList<ChessPiece>();
+  promotionPieces.add(new Rook(100, true));
+  promotionPieces.add(new Knight(101, true));
+  promotionPieces.add(new Bishop(102, true));
+  promotionPieces.add(new Queen(103, true));
+  promotionPiece = promotionPieces.get(3);
 }
 
 void drawGameStatusText(String text) { 
   fill(color(0,0,0));
-  text(text, 20, 500);
+  text(text, 20, 510);
 }
 
 void draw() {
@@ -52,30 +62,48 @@ void draw() {
   }
   background(color(150, 150, 150));
   gameBoard.draw();
+  drawPromotionSelect();
   
   if (!DEBUG) {
     playMove();
+    drawGameStatusText(gameStatus);
   } //<>//
 }
 
 void keyPressed() {
  if (DEBUG) {
    playMove();
+   drawGameStatusText(gameStatus);
  }
+}
+
+void drawPromotionSelect() {
+  fill(color(0,0,0));
+  text("Player Promotion:", 120, 530);
+  for (int i = 0; i < promotionPieces.size(); i++) {
+    ChessPiece piece = promotionPieces.get(i);
+    int xPos = 240 + (GRID_SIZE * i);
+    piece.draw(8, 4 + i);
+    if (piece == promotionPiece) {
+      stroke(color(142, 23, 2));
+      noFill();
+      rect(xPos, 480, GRID_SIZE-1, GRID_SIZE-1);
+    }
+  }
 }
 
 void playMove() {
   ArrayList<ChessPiece[][]> possibleBoards = gameBoard.getPossibleMoves(whiteMove);
-  String gameStatus = whiteMove ? "White turn" : "Black turn";
+  gameStatus = whiteMove ? "White turn" : "Black turn";
   // Check for checkmate
-  //System.out.println("IGNORE RIGHT BELOW HERE, CHRIS");
   if (gameBoard.isCurrentBoardInCheck(whiteMove) && possibleBoards.isEmpty()) {
     gameStatus = "CHECKMATE! " + (whiteMove ? "BLACK" : "WHITE") + " WINS!";
-    drawGameStatusText(gameStatus);
+    //drawGameStatusText(gameStatus);
     gameOver = true;
     return;
   } if (possibleBoards.isEmpty()) {
-    drawGameStatusText("Stalemate. No legal moves, but not in check: " + (whiteMove ? "WHITE" : "BLACK"));
+    gameStatus = "Stalemate!"; // No legal moves, but not in check: " + (whiteMove ? "WHITE" : "BLACK");
+    //drawGameStatusText("Stalemate. No legal moves, but not in check: " + (whiteMove ? "WHITE" : "BLACK"));
     gameOver = true;
     return;
   }
@@ -104,7 +132,10 @@ void playMove() {
 }
 
 void checkHumanInput() {
-  if (!mousePressed || (mousePressed && mouseY > 480)) {
+  if (!mousePressed || (mousePressed && mouseY > 480 && mouseX < 240)) {
+    return;
+  } else if (mouseY > 480 && mouseX > 240) {
+    promotionPiece = promotionPieces.get((mouseX - 240) / GRID_SIZE);
     return;
   }
   
@@ -124,6 +155,10 @@ void checkHumanInput() {
   
   for (ChessPiece[][] cb : playerLegalMoves) {
     if (cb[row][col] != null && cb[row][col].id == playerSelectedPiece.id) {
+      // If player is moving a pawn, it must either stay a pawn or promote. In the case of promotion, the possible moves have the pawn in the same place or have the right promotion type
+      if (playerSelectedPiece instanceof Pawn && !(cb[row][col] instanceof Pawn || cb[row][col].getClass().equals(promotionPiece.getClass()))) {
+        continue;
+      } 
       gameBoard.setBoard(cb);
       whiteMove = !whiteMove; 
       playerSelectedPiece = null;
