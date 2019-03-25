@@ -27,7 +27,7 @@ enum PlayerType {
 
 // TO CHANGE PLAYER TYPES, MODIFY THESE VALUES USING THE ENUMS
 PlayerType whitePlayer = PlayerType.HUMAN;
-PlayerType blackPlayer = PlayerType.HUMAN;
+PlayerType blackPlayer = PlayerType.RANDOM;
 
 // Game logic values
 ChessBoard gameBoard;
