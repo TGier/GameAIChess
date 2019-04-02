@@ -3,12 +3,9 @@ class Knight extends ChessPiece {
     super(id, isWhite, 1, isWhite ? "white_knight" : "black_knight");
   }
   
-  ArrayList<ChessPiece[][]> getPossibleMoves(ChessBoard currentBoard) {
+  ArrayList<ChessPiece[][]> getPossibleMoves(ChessPiece[][] currentBoard, int r, int c) {
     ArrayList<ChessPiece[][]> possibleMoves = new ArrayList<ChessPiece[][]>();
-    Pair currentLocation = currentBoard.getLocationForPieceCurrentBoard(this.id);
-    int r = currentLocation.r;
-    int c = currentLocation.c;
-    ChessPiece[][] boardWithoutPiece = ChessUtils.copyBoard(currentBoard.board);
+    ChessPiece[][] boardWithoutPiece = ChessUtils.copyBoard(currentBoard);
     boardWithoutPiece[r][c] = null;
     
     // TODO might be generating duplicate moves? Shouldn't matter, but may need to address for optimization

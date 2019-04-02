@@ -5,12 +5,9 @@ class King extends ChessPiece {
     super(id, isWhite, 1, isWhite ? "white_king" : "black_king");
   }
   
-  ArrayList<ChessPiece[][]> getPossibleMoves(ChessBoard currentBoard) {
+  ArrayList<ChessPiece[][]> getPossibleMoves(ChessPiece[][] currentBoard, int r, int c) {
     ArrayList<ChessPiece[][]> possibleMoves = new ArrayList<ChessPiece[][]>();
-    Pair currentLocation = currentBoard.getLocationForPieceCurrentBoard(this.id);
-    int r = currentLocation.r;
-    int c = currentLocation.c;
-    ChessPiece[][] boardWithoutPiece = ChessUtils.copyBoard(currentBoard.board);
+    ChessPiece[][] boardWithoutPiece = ChessUtils.copyBoard(currentBoard);
     boardWithoutPiece[r][c] = null;
     
     for (int x = -1; x <= 1; x++) {

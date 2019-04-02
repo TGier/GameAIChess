@@ -2,11 +2,31 @@
 class ChessBoard {
   ChessPiece[][] board;
   
+  final int WHITE_KING_ID = 5;
+  final int BLACK_KING_ID = 21;
+  
   ChessPiece whiteKing;
   ChessPiece blackKing;
   
   ChessBoard() {
     setupPieces();
+  }
+  
+  ChessBoard(ChessPiece[][] board) {
+    this.board = board;
+    for (int r = 0; r < BOARD_WIDTH; r++) {
+      for (int c = 0; c < BOARD_WIDTH; c++) {
+        if (board[r][c] == null) {
+          continue;
+        }
+        
+        if (board[r][c].id == WHITE_KING_ID) {
+          whiteKing = board[r][c];
+        } else if (board[r][c].id == BLACK_KING_ID) {
+          blackKing = board[r][c];
+        }
+      }
+    }
   }
   
   void setupPieces() {
@@ -17,7 +37,7 @@ class ChessBoard {
     board[7][1] = new Knight(2, true);
     board[7][2] = new Bishop(3, true);
     board[7][3] = new Queen(4, true);
-    board[7][4] = new King(5, true);
+    board[7][4] = new King(WHITE_KING_ID, true);
     board[7][5] = new Bishop(6, true);
     board[7][6] = new Knight(7, true);
     board[7][7] = new Rook(8, true);
@@ -35,7 +55,7 @@ class ChessBoard {
     board[0][1] = new Knight(18, false);
     board[0][2] = new Bishop(19, false);
     board[0][3] = new Queen(20, false);
-    board[0][4] = new King(21, false);
+    board[0][4] = new King(BLACK_KING_ID, false);
     board[0][5] = new Bishop(22, false);
     board[0][6] = new Knight(23, false);
     board[0][7] = new Rook(24, false);
@@ -63,11 +83,11 @@ class ChessBoard {
   
   void setBoard(ChessPiece[][] newBoard) {
     // TODO reset stalemate conditions?
-    board = newBoard;
+    this.board = newBoard;
   }
   
-  ArrayList<ChessPiece[][]> getLegalMovesForPiece(ChessPiece cp) {
-    ArrayList<ChessPiece[][]> possibleBoards = cp.getPossibleMoves(this);
+  ArrayList<ChessPiece[][]> getLegalMovesForPiece(ChessPiece cp, int r, int c) {
+    ArrayList<ChessPiece[][]> possibleBoards = cp.getPossibleMoves(this.board, r, c);
     ArrayList<ChessPiece[][]> legalBoards = new ArrayList<ChessPiece[][]>();
     for (ChessPiece[][] cb : possibleBoards) {
       // check for if the move puts our own King in check and filter out illegal moves
@@ -83,7 +103,7 @@ class ChessBoard {
     for (int r = 0; r < BOARD_WIDTH; r++) {
       for (int c = 0; c < BOARD_WIDTH; c++) {
         if (board[r][c] != null && board[r][c].isWhite == whiteMove) {
-          ArrayList<ChessPiece[][]> moves = board[r][c].getPossibleMoves(this);
+          ArrayList<ChessPiece[][]> moves = board[r][c].getPossibleMoves(this.board, r, c);
           if (moves != null) {
             possibleBoards.addAll(moves);
           } 
@@ -123,29 +143,8 @@ class ChessBoard {
     return isInCheck(this.board, white);
   }
   
-  void makeRandomMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
-    if (possibleBoards.isEmpty()) {
-      return;
-    }
-    board = possibleBoards.get((int) random(possibleBoards.size()));
-  }
-  
-  void makeMinimaxMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
-    // TODO
-  }
-  
-  void makeMCTSMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
-    // TODO
-  }
-  
   public Pair getLocationForPieceCurrentBoard(int id) {
     return getLocationForPieceInBoard(this.board, id);
-  }
-  
-  int evalBoard() {
-    int boardScore = 0;
-    // TODO
-    return boardScore;
   }
   
   void draw() {

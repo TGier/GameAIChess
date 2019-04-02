@@ -18,6 +18,8 @@ Assumptions/Setup:
 - Images are used from wikimedia commons and available under creative commons
 */
 
+import java.util.Collections;
+
 // Setting to TRUE allows the game to be "stepped" by pressing a key instead of time so AI moves can be followed easier
 boolean DEBUG = false;
 
@@ -26,8 +28,8 @@ enum PlayerType {
 }
 
 // TO CHANGE PLAYER TYPES, MODIFY THESE VALUES USING THE ENUMS
-PlayerType whitePlayer = PlayerType.HUMAN;
-PlayerType blackPlayer = PlayerType.RANDOM;
+PlayerType whitePlayer = PlayerType.MINIMAX;
+PlayerType blackPlayer = PlayerType.MINIMAX;
 
 // Game logic values
 ChessBoard gameBoard;
@@ -47,6 +49,10 @@ ChessPiece playerSelectedPiece;
 ArrayList<ChessPiece[][]> playerLegalMoves;
 ChessPiece promotionPiece;
 ArrayList<ChessPiece> promotionPieces;
+
+// MINIMAX values
+int MINIMAX_DEPTH = 4;
+int WIN_VAL = 100;
 
 void setup() {
   size(480, 540);
@@ -72,14 +78,12 @@ void draw() {
   
   if (!DEBUG) {
     playMove();
-    drawGameStatusText(gameStatus);
   } //<>//
 }
 
 void keyPressed() {
  if (DEBUG) {
    playMove();
-   drawGameStatusText(gameStatus);
  }
 }
 
@@ -114,14 +118,19 @@ void playMove() {
   if (inCheck && possibleBoards.isEmpty()) {
     gameStatus = "CHECKMATE! " + (whiteMove ? "BLACK" : "WHITE") + " WINS!";
     gameOver = true;
+    drawGameStatusText(gameStatus);
     return;
   } else if (possibleBoards.isEmpty()) {
     gameStatus = "Stalemate!"; // No legal moves, but not in check
     gameOver = true;
+    drawGameStatusText(gameStatus);
     return;
   } else if (inCheck) {
     gameStatus = (whiteMove ? "White move" : "Black move") + ", IN CHECK!";
   }
+  
+  // TODO find better place for this?
+  drawGameStatusText(gameStatus);
  
   PlayerType currentActor = whiteMove ? whitePlayer : blackPlayer;
   switch (currentActor) {
@@ -129,15 +138,15 @@ void playMove() {
       checkHumanInput();
       break;
     case RANDOM:
-      gameBoard.makeRandomMove(whiteMove, possibleBoards);
+      makeRandomMove(whiteMove, possibleBoards);
       whiteMove = !whiteMove;
       break;
     case MINIMAX:
-      gameBoard.makeMinimaxMove(whiteMove, possibleBoards);
+      makeMinimaxMove(whiteMove, possibleBoards);
       whiteMove = !whiteMove;
       break;
     case MCTS:
-      gameBoard.makeMCTSMove(whiteMove, possibleBoards);
+      makeMCTSMove(whiteMove, possibleBoards);
       whiteMove = !whiteMove;
       break;
   }
@@ -156,7 +165,7 @@ void checkHumanInput() {
   ChessPiece clickedPiece = gameBoard.getPiece(row, col, whiteMove);
   if (clickedPiece != null) {
     playerSelectedPiece = clickedPiece;
-    playerLegalMoves = gameBoard.getLegalMovesForPiece(playerSelectedPiece);
+    playerLegalMoves = gameBoard.getLegalMovesForPiece(playerSelectedPiece, row, col);
     squareHighlights.clear();
     for (ChessPiece[][] b : playerLegalMoves) {
       squareHighlights.add(getLocationForPieceInBoard(b, playerSelectedPiece.id));
@@ -174,6 +183,7 @@ void checkHumanInput() {
       playerSelectedPiece = null;
       playerLegalMoves.clear();
       squareHighlights.clear();
+      gameBoard.draw();
       return;
     }
   } 
@@ -202,5 +212,112 @@ public class Pair {
   public Pair(int r, int c) {
     this.r = r;
     this.c = c;
+  }
+}
+
+// MARK: move making functions
+  
+void makeRandomMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
+  if (possibleBoards.isEmpty()) {
+    return;
+  }
+  gameBoard.setBoard(possibleBoards.get((int) random(possibleBoards.size())));
+}
+
+void makeMinimaxMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
+  if (possibleBoards.isEmpty()) {
+    return;
+  }
+  
+  gameBoard.board = minimaxBoard(MINIMAX_DEPTH, whiteMove, possibleBoards);
+}
+
+void makeMCTSMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
+  // TODO
+}
+
+// MARK: minimax functions
+
+int evaluationFunction(ChessPiece[][] board) {
+  int score = 0;
+  for (int r = 0; r < BOARD_WIDTH; r++) {
+    for (int c = 0; c < BOARD_WIDTH; c++) {
+      ChessPiece piece = board[r][c];
+      if (piece != null) {
+        score += piece.pointValue * (piece.isWhite ? 1 : -1);
+      }
+    }
+  }
+  return score;
+}
+
+// A function that does the first layer of minimax and will return the Move made to get the score as opposed to just the value
+ChessPiece[][] minimaxBoard(int depth, boolean isWhite, ArrayList<ChessPiece[][]> nextBoards) {
+  ChessPiece[][] bestMove = nextBoards.get(0);
+  float bestValue = isWhite ? -1 * WIN_VAL : WIN_VAL;
+  float alpha = Float.NEGATIVE_INFINITY;
+  float beta = Float.POSITIVE_INFINITY;
+    
+  Collections.shuffle(nextBoards);
+  for (ChessPiece[][] board : nextBoards) {
+    float minimaxVal = minimax(board, depth - 1, !isWhite, alpha, beta);
+    if ((isWhite && minimaxVal >= bestValue) || (!isWhite && minimaxVal <= bestValue)) {
+      bestValue = minimaxVal;
+      bestMove = board;
+    }
+  }
+  return bestMove;
+}
+
+// Psuedo code for minimax followed from: https://www.youtube.com/watch?v=l-hh51ncgDI
+// For this project, white is the maximizing player in the tree 
+float minimax(ChessPiece[][] boardState, int depth, boolean isWhite, float alpha, float beta) {
+  // if at the depth, just return board value (May miss winning board states if evaluation is weird when winning state is at the furthest depth out)
+  if (depth == 0) {
+    return evaluationFunction(boardState);
+  }
+  
+  // Make a temp ChessBoard to wrap the raw board for extra function
+  ChessBoard curBoard = new ChessBoard(boardState);
+  ArrayList<ChessPiece[][]> moves = curBoard.getPossibleMoves(isWhite);
+  boolean selfInCheck = curBoard.isCurrentBoardInCheck(isWhite);
+  //boolean opponentInCheck = curBoard.isCurrentBoardInCheck(!isWhite);
+  boolean gameIsOver = moves.size() == 0;
+  
+  // TODO stalemate evaluations?
+  
+  // If the board is in check for the current player, return the win for the other player
+  if (gameIsOver) {
+    if (isWhite) {
+      return -1 * WIN_VAL * (selfInCheck ? 2 : 1);
+    } else if (!isWhite) {
+      return WIN_VAL * (selfInCheck ? 2 : 1);
+    }
+  }
+  
+  // If white, check for max value on white moves, else check for min value on black moves
+  if (isWhite) {
+    float bestVal = Float.NEGATIVE_INFINITY;
+    
+    for (ChessPiece[][] move : moves) {
+      float potentialValue = minimax(move, depth - 1, false, alpha, beta);
+      bestVal = max(bestVal, potentialValue);
+      alpha = max(potentialValue, alpha);
+      if (potentialValue >= beta) {
+        return bestVal;
+      }
+    }
+    return bestVal;
+  } else {float bestVal = Float.POSITIVE_INFINITY;
+    
+    for (ChessPiece[][] move : moves) {
+      float potentialValue = minimax(move, depth - 1, true, alpha, beta);
+      bestVal = min(bestVal, potentialValue);
+      beta = min(potentialValue, beta);
+      if (potentialValue <= alpha) {
+        return bestVal;
+      }
+    }
+    return bestVal;
   }
 }

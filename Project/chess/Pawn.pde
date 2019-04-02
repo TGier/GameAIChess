@@ -3,18 +3,15 @@ class Pawn extends ChessPiece {
     super(id, isWhite, 1, isWhite ? "white_pawn" : "black_pawn");
   }
   
-  ArrayList<ChessPiece[][]> getPossibleMoves(ChessBoard currentBoard) {
+  ArrayList<ChessPiece[][]> getPossibleMoves(ChessPiece[][] currentBoard, int r, int c) {
     ArrayList<ChessPiece[][]> possibleMoves = new ArrayList<ChessPiece[][]>();
-    Pair currentLocation = currentBoard.getLocationForPieceCurrentBoard(this.id);
-    int r = currentLocation.r;
-    int c = currentLocation.c;
-    boolean firstMove = (isWhite && r == 6) || (!isWhite && r == 1);
+    ChessPiece[][] boardWithoutPiece = ChessUtils.copyBoard(currentBoard);
+    boardWithoutPiece[r][c] = null;
     
+    boolean firstMove = (isWhite && r == 6) || (!isWhite && r == 1);
     int movingRow = isWhite ? r - 1 : r + 1; // The row the pawn can move into
     int twoSpaceMoveRow = isWhite ? r - 2 : r + 2; // The row the pawn can 2-space move into
     int promotionRow = isWhite ? 0 : BOARD_WIDTH - 1; // The row a pawn promotes in
-    ChessPiece[][] boardWithoutPiece = ChessUtils.copyBoard(currentBoard.board);
-    boardWithoutPiece[r][c] = null;
     
     // If space in front of pawn is open, allow moving forward
     if (boardWithoutPiece[movingRow][c] == null) {

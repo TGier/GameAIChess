@@ -3,12 +3,9 @@ class Rook extends ChessPiece {
     super(id, isWhite, 1, isWhite ? "white_rook" : "black_rook");
   }
   
-  ArrayList<ChessPiece[][]> getPossibleMoves(ChessBoard currentBoard) {
+  ArrayList<ChessPiece[][]> getPossibleMoves(ChessPiece[][] currentBoard, int r, int c) {
     ArrayList<ChessPiece[][]> possibleMoves = new ArrayList<ChessPiece[][]>();
-    Pair currentLocation = currentBoard.getLocationForPieceCurrentBoard(this.id);
-    int r = currentLocation.r;
-    int c = currentLocation.c;
-    ChessPiece[][] boardWithoutPiece = ChessUtils.copyBoard(currentBoard.board);
+    ChessPiece[][] boardWithoutPiece = ChessUtils.copyBoard(currentBoard);
     boardWithoutPiece[r][c] = null;
     
     // while loop to check up, down, left and right

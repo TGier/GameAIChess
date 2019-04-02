@@ -12,7 +12,7 @@ abstract class ChessPiece {
   }
   
   // Returns the list of all squares this piece can move to (TODO - all boards?)
-  abstract ArrayList<ChessPiece[][]> getPossibleMoves(ChessBoard currentBoard);
+  abstract ArrayList<ChessPiece[][]> getPossibleMoves(ChessPiece[][] currentBoard, int r, int c);
   
   // Returns if this piece can capture a piece on the given space if allowed to move again
   abstract boolean threatensSpace(ChessPiece[][] board, Pair space);
