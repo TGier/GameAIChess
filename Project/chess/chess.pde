@@ -28,7 +28,7 @@ enum PlayerType {
 }
 
 // TO CHANGE PLAYER TYPES, MODIFY THESE VALUES USING THE ENUMS
-PlayerType whitePlayer = PlayerType.MINIMAX;
+PlayerType whitePlayer = PlayerType.HUMAN;
 PlayerType blackPlayer = PlayerType.MINIMAX;
 
 // Game logic values
@@ -51,7 +51,7 @@ ChessPiece promotionPiece;
 ArrayList<ChessPiece> promotionPieces;
 
 // MINIMAX values
-int MINIMAX_DEPTH = 4;
+int MINIMAX_DEPTH = 5;
 int WIN_VAL = 100;
 
 void setup() {
@@ -228,7 +228,6 @@ void makeMinimaxMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards
   if (possibleBoards.isEmpty()) {
     return;
   }
-  
   gameBoard.board = minimaxBoard(MINIMAX_DEPTH, whiteMove, possibleBoards);
 }
 
@@ -253,19 +252,22 @@ int evaluationFunction(ChessPiece[][] board) {
 
 // A function that does the first layer of minimax and will return the Move made to get the score as opposed to just the value
 ChessPiece[][] minimaxBoard(int depth, boolean isWhite, ArrayList<ChessPiece[][]> nextBoards) {
+  Collections.shuffle(nextBoards);
   ChessPiece[][] bestMove = nextBoards.get(0);
-  float bestValue = isWhite ? -1 * WIN_VAL : WIN_VAL;
+  float bestValue = evaluationFunction(bestMove);
   float alpha = Float.NEGATIVE_INFINITY;
   float beta = Float.POSITIVE_INFINITY;
     
-  Collections.shuffle(nextBoards);
   for (ChessPiece[][] board : nextBoards) {
     float minimaxVal = minimax(board, depth - 1, !isWhite, alpha, beta);
+    System.out.println((isWhite ? "White: " : "Black: ") + "found value: " + minimaxVal);
     if ((isWhite && minimaxVal >= bestValue) || (!isWhite && minimaxVal <= bestValue)) {
       bestValue = minimaxVal;
       bestMove = board;
     }
   }
+  System.out.println((isWhite ? "White: " : "Black: ") + "best value: " + bestValue);
+  System.out.println("~~~");
   return bestMove;
 }
 
@@ -288,10 +290,12 @@ float minimax(ChessPiece[][] boardState, int depth, boolean isWhite, float alpha
   
   // If the board is in check for the current player, return the win for the other player
   if (gameIsOver) {
-    if (isWhite) {
-      return -1 * WIN_VAL * (selfInCheck ? 2 : 1);
-    } else if (!isWhite) {
-      return WIN_VAL * (selfInCheck ? 2 : 1);
+    if (selfInCheck) {
+      // We have been checked, return inverted win val
+      return WIN_VAL * (isWhite ? -1 : 1);
+    } else {
+      // Stalemate
+      return 0;
     }
   }
   

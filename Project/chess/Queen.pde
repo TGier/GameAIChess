@@ -1,6 +1,6 @@
 class Queen extends ChessPiece {
   Queen(int id, boolean isWhite) {
-    super(id, isWhite, 1, isWhite ? "white_queen" : "black_queen");
+    super(id, isWhite, 9, isWhite ? "white_queen" : "black_queen");
   }
   
   ArrayList<ChessPiece[][]> getPossibleMoves(ChessPiece[][] currentBoard, int r, int c) {

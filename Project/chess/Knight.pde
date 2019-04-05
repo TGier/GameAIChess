@@ -1,6 +1,6 @@
 class Knight extends ChessPiece {
   Knight(int id, boolean isWhite) {
-    super(id, isWhite, 1, isWhite ? "white_knight" : "black_knight");
+    super(id, isWhite, 3, isWhite ? "white_knight" : "black_knight");
   }
   
   ArrayList<ChessPiece[][]> getPossibleMoves(ChessPiece[][] currentBoard, int r, int c) {

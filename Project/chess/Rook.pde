@@ -1,6 +1,6 @@
 class Rook extends ChessPiece {
   Rook(int id, boolean isWhite) {
-    super(id, isWhite, 1, isWhite ? "white_rook" : "black_rook");
+    super(id, isWhite, 5, isWhite ? "white_rook" : "black_rook");
   }
   
   ArrayList<ChessPiece[][]> getPossibleMoves(ChessPiece[][] currentBoard, int r, int c) {

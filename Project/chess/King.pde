@@ -2,6 +2,7 @@ class King extends ChessPiece {
   boolean hasMoved = false;
   
   King(int id, boolean isWhite) {
+    // Technically worth infinite points but both players Kings will always be on the board so does not matter
     super(id, isWhite, 1, isWhite ? "white_king" : "black_king");
   }
   
