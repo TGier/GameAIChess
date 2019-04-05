@@ -28,8 +28,8 @@ enum PlayerType {
 }
 
 // TO CHANGE PLAYER TYPES, MODIFY THESE VALUES USING THE ENUMS
-PlayerType whitePlayer = PlayerType.HUMAN;
-PlayerType blackPlayer = PlayerType.MINIMAX;
+PlayerType whitePlayer = PlayerType.MINIMAX;
+PlayerType blackPlayer = PlayerType.MCTS;
 
 // Game logic values
 ChessBoard gameBoard;
@@ -142,6 +142,7 @@ void playMove() {
       whiteMove = !whiteMove;
       break;
     case MINIMAX:
+      System.out.println("Made minimax move");
       makeMinimaxMove(whiteMove, possibleBoards);
       whiteMove = !whiteMove;
       break;
@@ -228,11 +229,15 @@ void makeMinimaxMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards
   if (possibleBoards.isEmpty()) {
     return;
   }
-  gameBoard.board = minimaxBoard(MINIMAX_DEPTH, whiteMove, possibleBoards);
+  gameBoard.setBoard(minimaxBoard(MINIMAX_DEPTH, whiteMove, possibleBoards));
 }
 
 void makeMCTSMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
-  // TODO
+  if (possibleBoards.isEmpty()) {
+    return;
+  }
+  MCTSChess mcts = new MCTSChess(gameBoard.board, whiteMove, possibleBoards);
+  gameBoard.setBoard(mcts.getBestMove());
 }
 
 // MARK: minimax functions
@@ -260,14 +265,11 @@ ChessPiece[][] minimaxBoard(int depth, boolean isWhite, ArrayList<ChessPiece[][]
     
   for (ChessPiece[][] board : nextBoards) {
     float minimaxVal = minimax(board, depth - 1, !isWhite, alpha, beta);
-    System.out.println((isWhite ? "White: " : "Black: ") + "found value: " + minimaxVal);
     if ((isWhite && minimaxVal >= bestValue) || (!isWhite && minimaxVal <= bestValue)) {
       bestValue = minimaxVal;
       bestMove = board;
     }
   }
-  System.out.println((isWhite ? "White: " : "Black: ") + "best value: " + bestValue);
-  System.out.println("~~~");
   return bestMove;
 }
 
