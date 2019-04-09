@@ -33,7 +33,7 @@ public class MCTSChess {
   }
   
   ChessPiece[][] getBestMove() {
-    System.out.println("Starting MCTS to select move");
+    System.out.println("Starting MCTS to select move: " + (root.isWhite ? "white" : "black"));
     long startTime = System.currentTimeMillis();
    
     // MCTS is able to be stopped at any time. We wanted to let the AI have time to playout games but also limit it so the AI is relatively quick to play

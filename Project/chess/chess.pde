@@ -37,8 +37,8 @@ enum PlayerType {
 }
 
 // TO CHANGE PLAYER TYPES, MODIFY THESE VALUES USING THE ENUMS
-PlayerType whitePlayer = PlayerType.HUMAN;
-PlayerType blackPlayer = PlayerType.MINIMAX;
+PlayerType whitePlayer = PlayerType.MINIMAX;
+PlayerType blackPlayer = PlayerType.MCTS;
 
 // Game logic values
 ChessBoard gameBoard;
@@ -78,18 +78,26 @@ void setup() {
   promotionPieces.add(new Queen(103, true));
   promotionPiece = promotionPieces.get(3);
 }
-
+ //<>//
 void draw() {
   if (gameOver) {
     return;
   }
+  
   background(color(150, 150, 150));
-  gameBoard.draw();
-  drawPromotionSelect();
+  if (frameCount <= 1) {
+    gameBoard.draw();
+    drawPromotionSelect();
+    drawGameStatusText();
+    return;
+  }
   
   if (!DEBUG) {
     playMove();
-  } //<>//
+  }  
+  
+  gameBoard.draw();
+  drawPromotionSelect();
   drawGameStatusText();
 }
 
@@ -98,7 +106,6 @@ void keyPressed() {
    playMove();
  }
 }
-
 
 void drawGameStatusText() { 
   fill(color(0,0,0));
@@ -158,6 +165,7 @@ void playMove() {
     return;
   }
  
+  System.out.println("play move");
   PlayerType currentActor = whiteMove ? whitePlayer : blackPlayer;
   switch (currentActor) {
     case HUMAN:
@@ -176,6 +184,7 @@ void playMove() {
       whiteMove = !whiteMove;
       break;
   }
+  updateGameStatusText();
 }
 
 void checkHumanInput() {
@@ -209,11 +218,9 @@ void checkHumanInput() {
       whiteMove = !whiteMove; 
       
       // Update rendering values
-      updateGameStatusText();
       playerSelectedPiece = null;
       playerLegalMoves.clear();
       squareHighlights.clear();
-      gameBoard.draw();
       return;
     }
   } 
@@ -258,6 +265,7 @@ void makeMinimaxMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards
   if (possibleBoards.isEmpty()) {
     return;
   }
+  System.out.println("Minimax move made: " + (whiteMove ? "white" : "black"));
   gameBoard.setBoard(minimaxBoard(MINIMAX_DEPTH, whiteMove, possibleBoards));
 }
 
