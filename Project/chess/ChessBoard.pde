@@ -166,12 +166,12 @@ class ChessBoard {
     drawBoard();
     for (Pair mv : moveSquares) {
       stroke(0);
-      fill(255, 255, 0);
+      fill(PREVIOUS_MOVE_HIGHTLIGHT);
       rect(mv.c * GRID_SIZE, mv.r * GRID_SIZE, GRID_SIZE, GRID_SIZE);
     }
     for (Pair sq : squareHighlights) {
       stroke(0);
-      fill(129, 169, 234);
+      fill(LEGAL_MOVE_HIGHLIGHT);
       rect(sq.c * GRID_SIZE, sq.r * GRID_SIZE, GRID_SIZE, GRID_SIZE);
     }
     for (int r = 0; r < BOARD_WIDTH; r++) {

@@ -20,12 +20,11 @@ Assumptions/Setup:
 
 /*
   TODO
-  1) Color in the move that was just made - DONE
-  2) Debug issues where the game status is not updated properly during an AI player's move - Works as intended for human v human. With previous moves in place, not as big of an issue as AI moves take 1 frame
-  3) Implement the saving of training data from 1 layer of the MCTS to the next
+  1) Implement the saving of training data from 1 layer of the MCTS to the next
     - Must distinguish between white wins, black wins, and draws/uninteresting games
     - Need to be able to advance the MCTS for the player who isn't playing using MCTS
     - Likely need a way to quickly compare if two ChessPiece[][] are the same
+  2) Fine tune the exploration-exploitation value of the MCTS for the selection phase
 */
 
 import java.util.Collections;
@@ -39,7 +38,7 @@ enum PlayerType {
 
 // TO CHANGE PLAYER TYPES, MODIFY THESE VALUES USING THE ENUMS
 PlayerType whitePlayer = PlayerType.HUMAN;
-PlayerType blackPlayer = PlayerType.HUMAN;
+PlayerType blackPlayer = PlayerType.MINIMAX;
 
 // Game logic values
 ChessBoard gameBoard;
@@ -49,8 +48,10 @@ boolean gameOver = false;
 // Rendering values
 static final int BOARD_WIDTH = 8;
 static final int GRID_SIZE = 480 / BOARD_WIDTH;
-final color LIGHT_SQUARE = color(247, 243, 195);
-final color DARK_SQUARE = color(96, 72, 5);
+final color LIGHT_SQUARE = color(255, 206, 158);
+final color DARK_SQUARE = color(209, 139, 71);
+final color LEGAL_MOVE_HIGHLIGHT = color(129, 169, 234, 165);
+final color PREVIOUS_MOVE_HIGHTLIGHT = color(255, 255, 0, 165);
 ArrayList<Pair> squareHighlights;
 String gameStatus = whiteMove ? "White turn" : "Black turn";
 
@@ -89,6 +90,7 @@ void draw() {
   if (!DEBUG) {
     playMove();
   } //<>//
+  drawGameStatusText();
 }
 
 void keyPressed() {
@@ -120,26 +122,41 @@ void drawPromotionSelect() {
   }
 }
 
+// Returns if the game is over and updates the text
+boolean updateGameStatusText() {
+  ArrayList<ChessPiece[][]> possibleBoards = gameBoard.getPossibleMoves(whiteMove);
+  boolean inCheck = gameBoard.isCurrentBoardInCheck(whiteMove);
+  return updateGameStatusText(possibleBoards, inCheck);
+}
+
+// Returns if the game is over and updates the text for the given possible boards and whether or not the current board is in check
+boolean updateGameStatusText(ArrayList<ChessPiece[][]> possibleBoards, boolean inCheck) {
+  gameStatus = whiteMove ? "White move" : "Black move";
+  if (inCheck && possibleBoards.isEmpty()) {
+    gameStatus = "CHECKMATE! " + (whiteMove ? "BLACK" : "WHITE") + " WINS!";
+    gameOver = true;
+    drawGameStatusText();
+    return true;
+  } else if (possibleBoards.isEmpty()) {
+    gameStatus = "Stalemate!"; // No legal moves, but not in check
+    gameOver = true;
+    drawGameStatusText();
+    return true;
+  } else if (inCheck) {
+    gameStatus = (whiteMove ? "White move" : "Black move") + ", IN CHECK!";
+  }
+  return false;
+}
+
 void playMove() {
   ArrayList<ChessPiece[][]> possibleBoards = gameBoard.getPossibleMoves(whiteMove);
   gameStatus = whiteMove ? "White move" : "Black move";
   // Check for checkmate or easy stalemate
   boolean inCheck = gameBoard.isCurrentBoardInCheck(whiteMove);
-  if (inCheck && possibleBoards.isEmpty()) {
-    gameStatus = "CHECKMATE! " + (whiteMove ? "BLACK" : "WHITE") + " WINS!";
-    gameOver = true;
-    drawGameStatusText();
+  boolean gameOver = updateGameStatusText(possibleBoards, inCheck);
+  if (gameOver) {
     return;
-  } else if (possibleBoards.isEmpty()) {
-    gameStatus = "Stalemate!"; // No legal moves, but not in check
-    gameOver = true;
-    drawGameStatusText();
-    return;
-  } else if (inCheck) {
-    gameStatus = (whiteMove ? "White move" : "Black move") + ", IN CHECK!";
   }
-  
-  drawGameStatusText();
  
   PlayerType currentActor = whiteMove ? whitePlayer : blackPlayer;
   switch (currentActor) {
@@ -187,8 +204,12 @@ void checkHumanInput() {
       if (playerSelectedPiece instanceof Pawn && !(cb[row][col] instanceof Pawn || cb[row][col].getClass().equals(promotionPiece.getClass()))) {
         continue;
       } 
+      // update the game state
       gameBoard.setBoard(cb);
       whiteMove = !whiteMove; 
+      
+      // Update rendering values
+      updateGameStatusText();
       playerSelectedPiece = null;
       playerLegalMoves.clear();
       squareHighlights.clear();

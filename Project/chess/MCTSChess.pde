@@ -3,6 +3,10 @@
  * - http://mcts.ai/about/index.html
  * - https://www.youtube.com/watch?v=lhFXKNyA0QA
  * - https://www.geeksforgeeks.org/ml-monte-carlo-tree-search-mcts/
+ *
+ * NOTE:
+ * 1) We determine a given playout is "uninteresting" at 100 random moves. This is to keep the game from pigeon-holing on 1 playthrough as we don't have some of the less common stalemate/draw rules
+ * 2) When we explore from a node, we add all the valid children instead of just a single one. This is done as we wanted to avoid spending time determining if a randomly chosen new child was already considered
  */
  
  /*
@@ -101,9 +105,11 @@ class TreeNode {
       if (this.children.isEmpty()) {
         return this;
       }
+      // We did expansion, we should select an immediate child
+      depth = 1;
     }
     
-    // traverse the tree choosing the "best" child (THAT MATH THING) until you hit max depth or a node with no children
+    // traverse the tree choosing the "best" child (exploitation v exploration) until you hit max depth or a node with no children
     Collections.shuffle(this.children);
     TreeNode bestChild = this.children.get(0);
     float bestValue = this.children.get(0).getValue();
