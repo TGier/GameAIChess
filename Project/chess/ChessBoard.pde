@@ -1,6 +1,7 @@
 
 class ChessBoard {
   ChessPiece[][] board;
+  ArrayList<Pair> moveSquares; // The list of spaces that changed between moves
   
   final int WHITE_KING_ID = 5;
   final int BLACK_KING_ID = 21;
@@ -9,10 +10,12 @@ class ChessBoard {
   ChessPiece blackKing;
   
   ChessBoard() {
+    this.moveSquares = new ArrayList<Pair>();
     setupPieces();
   }
   
   ChessBoard(ChessPiece[][] board) {
+    this.moveSquares = new ArrayList<Pair>();
     this.board = board;
     for (int r = 0; r < BOARD_WIDTH; r++) {
       for (int c = 0; c < BOARD_WIDTH; c++) {
@@ -83,6 +86,18 @@ class ChessBoard {
   
   void setBoard(ChessPiece[][] newBoard) {
     // TODO reset stalemate conditions?
+    this.moveSquares = new ArrayList<Pair>();
+    for (int r = 0; r < BOARD_WIDTH; r++) {
+      for (int c = 0; c < BOARD_WIDTH; c++) {
+        ChessPiece oldPiece = this.board[r][c];
+        ChessPiece newPiece = newBoard[r][c];
+        int oldId = oldPiece != null ? oldPiece.id : -1;
+        int newId = newPiece != null ? newPiece.id : -1;
+        if (oldId != newId) {
+          moveSquares.add(new Pair(r, c));
+        }
+      }
+    }
     this.board = newBoard;
   }
   
@@ -149,6 +164,11 @@ class ChessBoard {
   
   void draw() {
     drawBoard();
+    for (Pair mv : moveSquares) {
+      stroke(0);
+      fill(255, 255, 0);
+      rect(mv.c * GRID_SIZE, mv.r * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+    }
     for (Pair sq : squareHighlights) {
       stroke(0);
       fill(129, 169, 234);

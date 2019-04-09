@@ -18,6 +18,16 @@ Assumptions/Setup:
 - Images are used from wikimedia commons and available under creative commons
 */
 
+/*
+  TODO
+  1) Color in the move that was just made - DONE
+  2) Debug issues where the game status is not updated properly during an AI player's move - Works as intended for human v human. With previous moves in place, not as big of an issue as AI moves take 1 frame
+  3) Implement the saving of training data from 1 layer of the MCTS to the next
+    - Must distinguish between white wins, black wins, and draws/uninteresting games
+    - Need to be able to advance the MCTS for the player who isn't playing using MCTS
+    - Likely need a way to quickly compare if two ChessPiece[][] are the same
+*/
+
 import java.util.Collections;
 
 // Setting to TRUE allows the game to be "stepped" by pressing a key instead of time so AI moves can be followed easier
@@ -28,8 +38,8 @@ enum PlayerType {
 }
 
 // TO CHANGE PLAYER TYPES, MODIFY THESE VALUES USING THE ENUMS
-PlayerType whitePlayer = PlayerType.MINIMAX;
-PlayerType blackPlayer = PlayerType.MCTS;
+PlayerType whitePlayer = PlayerType.HUMAN;
+PlayerType blackPlayer = PlayerType.HUMAN;
 
 // Game logic values
 ChessBoard gameBoard;
@@ -88,10 +98,10 @@ void keyPressed() {
 }
 
 
-void drawGameStatusText(String text) { 
+void drawGameStatusText() { 
   fill(color(0,0,0));
   textSize(14);
-  text(text, 20, 500);
+  text(gameStatus, 20, 500);
 }
 
 void drawPromotionSelect() {
@@ -118,19 +128,18 @@ void playMove() {
   if (inCheck && possibleBoards.isEmpty()) {
     gameStatus = "CHECKMATE! " + (whiteMove ? "BLACK" : "WHITE") + " WINS!";
     gameOver = true;
-    drawGameStatusText(gameStatus);
+    drawGameStatusText();
     return;
   } else if (possibleBoards.isEmpty()) {
     gameStatus = "Stalemate!"; // No legal moves, but not in check
     gameOver = true;
-    drawGameStatusText(gameStatus);
+    drawGameStatusText();
     return;
   } else if (inCheck) {
     gameStatus = (whiteMove ? "White move" : "Black move") + ", IN CHECK!";
   }
   
-  // TODO find better place for this?
-  drawGameStatusText(gameStatus);
+  drawGameStatusText();
  
   PlayerType currentActor = whiteMove ? whitePlayer : blackPlayer;
   switch (currentActor) {
@@ -142,7 +151,6 @@ void playMove() {
       whiteMove = !whiteMove;
       break;
     case MINIMAX:
-      System.out.println("Made minimax move");
       makeMinimaxMove(whiteMove, possibleBoards);
       whiteMove = !whiteMove;
       break;
