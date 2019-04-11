@@ -196,4 +196,15 @@ class ChessBoard {
       }
     }
   }
+  
+  String toString() {
+    String str = "";
+    for (int r = 0; r < BOARD_WIDTH; r++) {
+      for (int c = 0; c < BOARD_WIDTH; c++) {
+        ChessPiece piece = this.board[r][c];
+        str += (piece != null ? piece.id : "n");
+      }
+    }
+    return str;
+  }
 }

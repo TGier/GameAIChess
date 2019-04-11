@@ -65,6 +65,9 @@ ArrayList<ChessPiece> promotionPieces;
 int MINIMAX_DEPTH = 5;
 int WIN_VAL = 100;
 
+// MCTS controller
+MCTSChess mcts;
+
 void setup() {
   size(480, 540);
   frameRate(30);
@@ -273,8 +276,10 @@ void makeMCTSMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
   if (possibleBoards.isEmpty()) {
     return;
   }
-  MCTSChess mcts = new MCTSChess(gameBoard.board, whiteMove, possibleBoards);
-  gameBoard.setBoard(mcts.getBestMove());
+  if (mcts == null) {
+    mcts = new MCTSChess(gameBoard.board, whiteMove, possibleBoards);
+  }
+  gameBoard.setBoard(mcts.getBestMove(gameBoard));
 }
 
 // MARK: minimax functions

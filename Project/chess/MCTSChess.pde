@@ -32,17 +32,22 @@ public class MCTSChess {
     this.root = new TreeNode(board, whiteMove, possibleNextMoves);
   }
   
-  ChessPiece[][] getBestMove() {
+  ChessPiece[][] getBestMove(ChessBoard cb) {
+    if (!root.board.toString().equals(cb.toString())) {
+      System.err.println("ERROR: Attempting to get move from a board that is not the same as the current root");
+      return null;
+    } 
+    
     System.out.println("Starting MCTS to select move: " + (root.isWhite ? "white" : "black"));
     long startTime = System.currentTimeMillis();
    
     // MCTS is able to be stopped at any time. We wanted to let the AI have time to playout games but also limit it so the AI is relatively quick to play
     while (System.currentTimeMillis() < (startTime + TIME_PER_MCTS_EXPLORATION)) {
       // Selection and Expansion
-      TreeNode selectedNode = root.selectAndExpand(MAX_MCTS_DEPTH);
+      TreeNode selectedNode = root.selectAndExpand(root.isWhite, MAX_MCTS_DEPTH);
     
       // Playout on selected node
-      int val = selectedNode.playout(root.isWhite);
+      Pair val = selectedNode.playout(root.isWhite);
     
       // Back propagation of the playout result to parents of the source of the playout
       selectedNode.backPropagate(val);
@@ -50,8 +55,11 @@ public class MCTSChess {
     }
     
     // Select child of root that has the most simulations. MCTS should do the most playouts from the most interesting move
-    System.out.printf("MCTS Move selected after %d ms. Total simulations: %d, Total wins: %d\n", System.currentTimeMillis() - startTime, root.simulations, root.wins);
+    System.out.printf("MCTS Move selected after %d ms. Total simulations: %d, Total wins: %d\n", System.currentTimeMillis() - startTime, root.simulations, (root.isWhite ? root.whiteWins : root.blackWins));
     return root.selectMove().board;
+  }
+  
+  void advanceToBoard(ChessPiece[][] board) {
   }
 }
 
@@ -61,7 +69,8 @@ class TreeNode {
   TreeNode parent; // for back propogation
   
   boolean isWhite; // If this tree node represents a board for white to make a move on
-  int wins = 0; // The estimated value based on playouts. A win is 1, anything else is 0
+  int whiteWins = 0; // The number of white wins found in playouts from this node
+  int blackWins = 0; // The number of black wins found in playouts from this node
   int simulations = 0; // the number of simulations run
   
   TreeNode(ChessPiece[][] board, boolean whiteMove) {
@@ -82,16 +91,16 @@ class TreeNode {
     }
   }
   
-  float getValue() {
+  float getValue(boolean whiteMove) {
     // TODO tune these values
     float c = 1.5;
     float epsilon = 0.1;
     
     // val + c * sqrt(ln(parent.simulations) / (epsilon + simulations))
-    return wins + c * sqrt(log(parent.simulations) / (epsilon + simulations));
+    return (whiteMove ? whiteWins : blackWins) + c * sqrt(log(parent.simulations) / (epsilon + simulations));
   }
   
-  TreeNode selectAndExpand(int depth) {
+  TreeNode selectAndExpand(boolean whiteMove, int depth) {
     // If at max depth, select this node
     if (depth == 0) {
       return this;
@@ -112,16 +121,16 @@ class TreeNode {
     // traverse the tree choosing the "best" child (exploitation v exploration) until you hit max depth or a node with no children
     Collections.shuffle(this.children);
     TreeNode bestChild = this.children.get(0);
-    float bestValue = this.children.get(0).getValue();
+    float bestValue = this.children.get(0).getValue(whiteMove);
     
     for (TreeNode tn : children) {
-      float childVal = tn.getValue();
+      float childVal = tn.getValue(whiteMove);
       if (bestChild == null || bestValue < childVal) {
         bestChild = tn;
         bestValue = childVal;
       }
     }
-    return bestChild.selectAndExpand(depth - 1);  
+    return bestChild.selectAndExpand(whiteMove, depth - 1);  
   }
   
   void expandTree() {
@@ -134,7 +143,8 @@ class TreeNode {
     }
   }
   
-  int playout(boolean whiteWins) {
+  // Returns a Pair of (whiteWin, blackWin)
+  Pair playout(boolean whiteWins) {
     // play out a game from this board making random moves
     boolean curWhite = this.isWhite;
     ChessBoard curBoard = new ChessBoard(this.board.board);
@@ -146,20 +156,20 @@ class TreeNode {
       ArrayList<ChessPiece[][]> legalMoves = curBoard.getPossibleMoves(curWhite);
       
       // check if the game is over (no legal moves to playout, then determine if a "win" for the correct player)
-      // If end state, return 1 or 0
+      // If end state, return the win pair
       if (legalMoves.isEmpty()) {
         // Hit a case of no legal moves
         if (whiteWins && curBoard.isCurrentBoardInCheck(false)) {
           // We are tracking white wins and black is in checkmate
           //System.out.println("Playout found checkmate win for white!");
-          return 1;
+          return new Pair(1, 0);
         } else if (!whiteWins && curBoard.isCurrentBoardInCheck(true)) {
           //System.out.println("Playout found checkmate win for black!");
           // We are tracking black wins and white is in checkmate
-          return 1;
+          return new Pair(0, 1);
         }
         //System.out.println("Playout found stalemate or a checkmate loss...");
-        return 0;
+        return new Pair(0, 0);
       }
       
       // else, try next move
@@ -170,11 +180,12 @@ class TreeNode {
     }
     
     //System.out.printf("Playout exceeded %d moves. Determined as a loss.\n", MAX_PLAYOUT_MOVES);
-    return 0;
+    return new Pair(0, 0);
   }
   
-  void backPropagate(int val) {
-    this.wins += val;
+  void backPropagate(Pair val) {
+    this.whiteWins += val.r;
+    this.blackWins += val.c;
     this.simulations += 1;
     if (this.parent != null) {
       parent.backPropagate(val);
@@ -192,7 +203,7 @@ class TreeNode {
         mostSims = tn.simulations;
       }
     }
-    System.out.printf("Selected move with %d wins of %d simulations\n", bestChild.wins, bestChild.simulations);
+    System.out.printf("Selected move with %d white wins and %d black wins with %d simulations\n", bestChild.whiteWins, bestChild.blackWins, bestChild.simulations);
     return bestChild.board;
   }
 }
