@@ -1,5 +1,6 @@
 static class ChessUtils {
   
+  // Make a copy of the given board
   public static ChessPiece[][] copyBoard(ChessPiece[][] board) {
     ChessPiece[][] copy = new ChessPiece[BOARD_WIDTH][BOARD_WIDTH];
     for (int r = 0; r < BOARD_WIDTH; r++) {
@@ -102,5 +103,18 @@ static class ChessUtils {
       }
     }
     return true;
+  }
+  
+  public static int evaluationFunction(ChessPiece[][] board) {
+    int score = 0;
+    for (int r = 0; r < BOARD_WIDTH; r++) {
+      for (int c = 0; c < BOARD_WIDTH; c++) {
+        ChessPiece piece = board[r][c];
+        if (piece != null) {
+          score += piece.pointValue * (piece.isWhite ? 1 : -1);
+        }
+      }
+    }
+    return score;
   }
 }

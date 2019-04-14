@@ -28,7 +28,6 @@ class King extends ChessPiece {
       }
     }
     
-    // TODO castling? Stretch goal, "edge case" move
     return possibleMoves;
   }
   

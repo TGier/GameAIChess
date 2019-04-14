@@ -11,7 +11,7 @@ abstract class ChessPiece {
     this.img = loadImage(imgStr + ".png");
   }
   
-  // Returns the list of all squares this piece can move to (TODO - all boards?)
+  // Returns all resulting boards of this piece's valid moves.
   abstract ArrayList<ChessPiece[][]> getPossibleMoves(ChessPiece[][] currentBoard, int r, int c);
   
   // Returns if this piece can capture a piece on the given space if allowed to move again

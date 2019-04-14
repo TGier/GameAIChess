@@ -92,7 +92,6 @@ class Pawn extends ChessPiece {
         possibleMoves.add(queenPromotion);
       }
     }
-    // TODO En passant?
     
     return possibleMoves;
   }

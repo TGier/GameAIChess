@@ -18,27 +18,19 @@ Assumptions/Setup:
 - Images are used from wikimedia commons and available under creative commons
 */
 
-/*
-  TODO
-  1) Implement the saving of training data from 1 layer of the MCTS to the next
-    - Must distinguish between white wins, black wins, and draws/uninteresting games
-    - Need to be able to advance the MCTS for the player who isn't playing using MCTS
-    - Likely need a way to quickly compare if two ChessPiece[][] are the same
-  2) Fine tune the exploration-exploitation value of the MCTS for the selection phase
-*/
-
 import java.util.Collections;
 
-// Setting to TRUE allows the game to be "stepped" by pressing a key instead of time so AI moves can be followed easier
-boolean DEBUG = false;
-
 enum PlayerType {
-  HUMAN, RANDOM, MINIMAX, MCTS
+  HUMAN, // A human player. Must click to make moves
+  RANDOM, // An AI that makes totally random moves
+  MINIMAX, // An AI that uses a Minimax with Alpha-Beta-Pruning strategy
+  MCTS,  // An AI that uses basic MCTS
+  MCTS_PB // An AI that uses MCTS but includes progressive bias elements when performing selections
 }
 
 // TO CHANGE PLAYER TYPES, MODIFY THESE VALUES USING THE ENUMS
-PlayerType whitePlayer = PlayerType.MINIMAX;
-PlayerType blackPlayer = PlayerType.MCTS;
+PlayerType whitePlayer = PlayerType.MCTS;
+PlayerType blackPlayer = PlayerType.MINIMAX;
 
 // Game logic values
 ChessBoard gameBoard;
@@ -67,11 +59,16 @@ int WIN_VAL = 100;
 
 // MCTS controller
 MCTSChess mcts;
+boolean MCTS_CACHE = false;
+
+// Keep track of the number of moves in a game
+int moveCount = 0;
 
 void setup() {
   size(480, 540);
   frameRate(30);
-  gameBoard = new ChessBoard();
+  SampleBoards sampleBoards = new SampleBoards();
+  gameBoard = new ChessBoard(sampleBoards.getDefaultBoard());
   squareHighlights = new ArrayList<Pair>();
   
   promotionPieces = new ArrayList<ChessPiece>();
@@ -95,19 +92,11 @@ void draw() {
     return;
   }
   
-  if (!DEBUG) {
-    playMove();
-  }  
+  playMove();
   
   gameBoard.draw();
   drawPromotionSelect();
   drawGameStatusText();
-}
-
-void keyPressed() {
- if (DEBUG) {
-   playMove();
- }
 }
 
 void drawGameStatusText() { 
@@ -133,59 +122,74 @@ void drawPromotionSelect() {
 }
 
 // Returns if the game is over and updates the text
-boolean updateGameStatusText() {
+void updateGameStatusText() {
   ArrayList<ChessPiece[][]> possibleBoards = gameBoard.getPossibleMoves(whiteMove);
   boolean inCheck = gameBoard.isCurrentBoardInCheck(whiteMove);
-  return updateGameStatusText(possibleBoards, inCheck);
-}
-
-// Returns if the game is over and updates the text for the given possible boards and whether or not the current board is in check
-boolean updateGameStatusText(ArrayList<ChessPiece[][]> possibleBoards, boolean inCheck) {
+  
   gameStatus = whiteMove ? "White move" : "Black move";
+  Winner winner = Winner.IN_PROGRESS;
   if (inCheck && possibleBoards.isEmpty()) {
     gameStatus = "CHECKMATE! " + (whiteMove ? "BLACK" : "WHITE") + " WINS!";
+    winner = (whiteMove ? Winner.BLACK : Winner.WHITE);
     gameOver = true;
     drawGameStatusText();
-    return true;
   } else if (possibleBoards.isEmpty()) {
     gameStatus = "Stalemate!"; // No legal moves, but not in check
+    winner = Winner.STALEMATE;
     gameOver = true;
     drawGameStatusText();
-    return true;
   } else if (inCheck) {
     gameStatus = (whiteMove ? "White move" : "Black move") + ", IN CHECK!";
   }
-  return false;
+  
+  printStats(winner);
+}
+
+boolean isGameOver() {
+  ArrayList<ChessPiece[][]> possibleBoards = gameBoard.getPossibleMoves(whiteMove);
+  boolean inCheck = gameBoard.isCurrentBoardInCheck(whiteMove);
+  if (inCheck && possibleBoards.isEmpty()) {
+    return true;
+  } else if (possibleBoards.isEmpty()) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 void playMove() {
   ArrayList<ChessPiece[][]> possibleBoards = gameBoard.getPossibleMoves(whiteMove);
   gameStatus = whiteMove ? "White move" : "Black move";
   // Check for checkmate or easy stalemate
-  boolean inCheck = gameBoard.isCurrentBoardInCheck(whiteMove);
-  boolean gameOver = updateGameStatusText(possibleBoards, inCheck);
+  //boolean inCheck = gameBoard.isCurrentBoardInCheck(whiteMove);
+  boolean gameOver = isGameOver();
   if (gameOver) {
+    updateGameStatusText();
     return;
   }
  
-  System.out.println("play move");
   PlayerType currentActor = whiteMove ? whitePlayer : blackPlayer;
   switch (currentActor) {
     case HUMAN:
       checkHumanInput();
       break;
     case RANDOM:
-      makeRandomMove(whiteMove, possibleBoards);
-      whiteMove = !whiteMove;
+      makeRandomMove(possibleBoards);
       break;
     case MINIMAX:
       makeMinimaxMove(whiteMove, possibleBoards);
-      whiteMove = !whiteMove;
       break;
     case MCTS:
-      makeMCTSMove(whiteMove, possibleBoards);
-      whiteMove = !whiteMove;
+      makeMCTSMove(whiteMove, possibleBoards, false);
       break;
+    case MCTS_PB:
+      makeMCTSMove(whiteMove, possibleBoards, true);
+      break;
+  }
+  if (currentActor != PlayerType.HUMAN) {
+    whiteMove = !whiteMove;
+    updateMCTS();
+    moveCount += 1;
   }
   updateGameStatusText();
 }
@@ -218,7 +222,9 @@ void checkHumanInput() {
       } 
       // update the game state
       gameBoard.setBoard(cb);
-      whiteMove = !whiteMove; 
+      whiteMove = !whiteMove;
+      updateMCTS();
+      moveCount += 1;
       
       // Update rendering values
       playerSelectedPiece = null;
@@ -227,6 +233,34 @@ void checkHumanInput() {
       return;
     }
   } 
+}
+
+public enum Winner {
+  WHITE,
+  BLACK,
+  STALEMATE,
+  IN_PROGRESS
+}
+
+void printStats(Winner winner) {  
+  String winnerStr = "";
+  if (winner == Winner.IN_PROGRESS || winner == null) {
+    winnerStr = "No winner! Game still in progress!";
+  }
+  if (winner == Winner.WHITE) {
+    winnerStr = "Game over! White wins!";
+  }
+  if (winner == Winner.BLACK) {
+    winnerStr = "Game over! Black wins!";
+  }
+  if (winner == Winner.STALEMATE) {
+    winnerStr = "No winner! Stalemate!";
+  }
+  
+  System.out.println("-------STATS-------");
+  System.out.printf("Move #%d%n", moveCount);
+  System.out.println(winnerStr);
+  System.out.printf("Margin Of Victory: %d%n", ChessUtils.evaluationFunction(gameBoard.board));
 }
 
 // MARK: utility functions/class not in ChessUtils
@@ -241,7 +275,7 @@ public Pair getLocationForPieceInBoard(ChessPiece[][] board, int id) {
     }
   }
   
-  System.out.println("PIECE NOT IN BOARD WITH ID " + id);
+  System.err.println("Piece with id = " + id + " not found in board!");
   return null;
 }
 
@@ -255,9 +289,9 @@ public class Pair {
   }
 }
 
-// MARK: move making functions
+// MARK: move-making functions
   
-void makeRandomMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
+void makeRandomMove(ArrayList<ChessPiece[][]> possibleBoards) {
   if (possibleBoards.isEmpty()) {
     return;
   }
@@ -268,104 +302,22 @@ void makeMinimaxMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards
   if (possibleBoards.isEmpty()) {
     return;
   }
-  System.out.println("Minimax move made: " + (whiteMove ? "white" : "black"));
   gameBoard.setBoard(minimaxBoard(MINIMAX_DEPTH, whiteMove, possibleBoards));
 }
 
-void makeMCTSMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards) {
+void makeMCTSMove(boolean whiteMove, ArrayList<ChessPiece[][]> possibleBoards, boolean progBias) {
   if (possibleBoards.isEmpty()) {
     return;
   }
-  if (mcts == null) {
+  if (mcts == null || !MCTS_CACHE) {
     mcts = new MCTSChess(gameBoard.board, whiteMove, possibleBoards);
   }
-  gameBoard.setBoard(mcts.getBestMove(gameBoard));
+  gameBoard.setBoard(mcts.getBestMove(gameBoard, progBias));
 }
 
-// MARK: minimax functions
-
-int evaluationFunction(ChessPiece[][] board) {
-  int score = 0;
-  for (int r = 0; r < BOARD_WIDTH; r++) {
-    for (int c = 0; c < BOARD_WIDTH; c++) {
-      ChessPiece piece = board[r][c];
-      if (piece != null) {
-        score += piece.pointValue * (piece.isWhite ? 1 : -1);
-      }
-    }
-  }
-  return score;
-}
-
-// A function that does the first layer of minimax and will return the Move made to get the score as opposed to just the value
-ChessPiece[][] minimaxBoard(int depth, boolean isWhite, ArrayList<ChessPiece[][]> nextBoards) {
-  Collections.shuffle(nextBoards);
-  ChessPiece[][] bestMove = nextBoards.get(0);
-  float bestValue = evaluationFunction(bestMove);
-  float alpha = Float.NEGATIVE_INFINITY;
-  float beta = Float.POSITIVE_INFINITY;
-    
-  for (ChessPiece[][] board : nextBoards) {
-    float minimaxVal = minimax(board, depth - 1, !isWhite, alpha, beta);
-    if ((isWhite && minimaxVal >= bestValue) || (!isWhite && minimaxVal <= bestValue)) {
-      bestValue = minimaxVal;
-      bestMove = board;
-    }
-  }
-  return bestMove;
-}
-
-// Psuedo code for minimax followed from: https://www.youtube.com/watch?v=l-hh51ncgDI
-// For this project, white is the maximizing player in the tree 
-float minimax(ChessPiece[][] boardState, int depth, boolean isWhite, float alpha, float beta) {
-  // if at the depth, just return board value (May miss winning board states if evaluation is weird when winning state is at the furthest depth out)
-  if (depth == 0) {
-    return evaluationFunction(boardState);
-  }
-  
-  // Make a temp ChessBoard to wrap the raw board for extra function
-  ChessBoard curBoard = new ChessBoard(boardState);
-  ArrayList<ChessPiece[][]> moves = curBoard.getPossibleMoves(isWhite);
-  boolean selfInCheck = curBoard.isCurrentBoardInCheck(isWhite);
-  //boolean opponentInCheck = curBoard.isCurrentBoardInCheck(!isWhite);
-  boolean gameIsOver = moves.size() == 0;
-  
-  // TODO stalemate evaluations?
-  
-  // If the board is in check for the current player, return the win for the other player
-  if (gameIsOver) {
-    if (selfInCheck) {
-      // We have been checked, return inverted win val
-      return WIN_VAL * (isWhite ? -1 : 1);
-    } else {
-      // Stalemate
-      return 0;
-    }
-  }
-  
-  // If white, check for max value on white moves, else check for min value on black moves
-  if (isWhite) {
-    float bestVal = Float.NEGATIVE_INFINITY;
-    
-    for (ChessPiece[][] move : moves) {
-      float potentialValue = minimax(move, depth - 1, false, alpha, beta);
-      bestVal = max(bestVal, potentialValue);
-      alpha = max(potentialValue, alpha);
-      if (potentialValue >= beta) {
-        return bestVal;
-      }
-    }
-    return bestVal;
-  } else {float bestVal = Float.POSITIVE_INFINITY;
-    
-    for (ChessPiece[][] move : moves) {
-      float potentialValue = minimax(move, depth - 1, true, alpha, beta);
-      bestVal = min(bestVal, potentialValue);
-      beta = min(potentialValue, beta);
-      if (potentialValue <= alpha) {
-        return bestVal;
-      }
-    }
-    return bestVal;
+// Update the MCTSChess object if we are caching data 
+void updateMCTS() {
+  if (mcts != null && MCTS_CACHE) {
+    mcts.advanceToBoard(gameBoard, whiteMove);
   }
 }

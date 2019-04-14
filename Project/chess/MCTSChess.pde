@@ -1,27 +1,20 @@
 /* Wrapper for the MCTS logic for our chess game
- * Resources we used when researching MCTS:
+ * Resources we used when researching MCTS and evaluation functions:
  * - http://mcts.ai/about/index.html
  * - https://www.youtube.com/watch?v=lhFXKNyA0QA
  * - https://www.geeksforgeeks.org/ml-monte-carlo-tree-search-mcts/
+ * - http://www.ke.tu-darmstadt.de/lehre/arbeiten/bachelor/2012/Arenz_Oleg.pdf
  *
  * NOTE:
  * 1) We determine a given playout is "uninteresting" at 100 random moves. This is to keep the game from pigeon-holing on 1 playthrough as we don't have some of the less common stalemate/draw rules
  * 2) When we explore from a node, we add all the valid children instead of just a single one. This is done as we wanted to avoid spending time determining if a randomly chosen new child was already considered
  */
+
  
- /*
- ~~~~~~~~~~~~~~ NOTES TO IMPROVE THIS
-   1) Try to optmization stuff at the bottom of this file to reuse previous runs. It's wasteful to redo previous explorations when we can potentially carry data over
-     Plus, MCTS gets better the more simulations it can run
-   2) Adjust the selection formula when selecting to explore (we may want to explore nodes we win on a lot over nodes we haven't looked at)
- 
- */
- 
- 
- // MCTS values used to help make the AI more playable and faster
-int MAX_MCTS_DEPTH = 4; // Maximum depth for EXPLORATION of nodes
+// MCTS values used to help make the AI more playable and faster
+int MAX_MCTS_DEPTH = 7; // Maximum depth for EXPLORATION of nodes
 // Maximum moves in a playout before determining it as "not a win", used as Chess can theoretically move back and forth a lot in cases of players making random moves. Needed the search to have a guaranteed "end"
-int MAX_PLAYOUT_MOVES = 100;
+int MAX_PLAYOUT_MOVES = 70;
 int TIME_PER_MCTS_EXPLORATION = 10000; // time in MS to run MCTS exploration and simulation. After this time has passed, no NEW playouts will be performed, but the current playout will be allowed to finish
 
  
@@ -32,34 +25,49 @@ public class MCTSChess {
     this.root = new TreeNode(board, whiteMove, possibleNextMoves);
   }
   
-  ChessPiece[][] getBestMove(ChessBoard cb) {
+  ChessPiece[][] getBestMove(ChessBoard cb, boolean progBias) {
     if (!root.board.toString().equals(cb.toString())) {
       System.err.println("ERROR: Attempting to get move from a board that is not the same as the current root");
       return null;
     } 
     
-    System.out.println("Starting MCTS to select move: " + (root.isWhite ? "white" : "black"));
     long startTime = System.currentTimeMillis();
    
     // MCTS is able to be stopped at any time. We wanted to let the AI have time to playout games but also limit it so the AI is relatively quick to play
     while (System.currentTimeMillis() < (startTime + TIME_PER_MCTS_EXPLORATION)) {
       // Selection and Expansion
-      TreeNode selectedNode = root.selectAndExpand(root.isWhite, MAX_MCTS_DEPTH);
+      TreeNode selectedNode = root.selectAndExpand(root.isWhite, MAX_MCTS_DEPTH, progBias);
     
       // Playout on selected node
       Pair val = selectedNode.playout(root.isWhite);
     
       // Back propagation of the playout result to parents of the source of the playout
       selectedNode.backPropagate(val);
-      //System.out.println("Playout completed");
     }
     
     // Select child of root that has the most simulations. MCTS should do the most playouts from the most interesting move
-    System.out.printf("MCTS Move selected after %d ms. Total simulations: %d, Total wins: %d\n", System.currentTimeMillis() - startTime, root.simulations, (root.isWhite ? root.whiteWins : root.blackWins));
     return root.selectMove().board;
   }
   
-  void advanceToBoard(ChessPiece[][] board) {
+  void advanceToBoard(ChessBoard board, boolean whiteMove) {
+    if (board.toString().equals(root.board.toString())) {
+      return;
+    }
+    
+    TreeNode nextRoot = null;
+    for (TreeNode n : root.children) {
+      if (board.toString().equals(n.board.toString()) && n.isWhite == whiteMove) {
+        //System.out.println("Found child node with same board and current acting player. Using that...");
+        nextRoot = n;
+        break;
+      }
+    }
+    
+    if (nextRoot == null) {
+      //System.err.println("Couldn't find child to advance root to! Reseting training data...");
+      root = new TreeNode(board.board, whiteMove);
+    }
+    this.root = nextRoot;
   }
 }
 
@@ -91,21 +99,30 @@ class TreeNode {
     }
   }
   
-  float getValue(boolean whiteMove) {
-    // TODO tune these values
-    float c = 1.5;
-    float epsilon = 0.1;
+  float getValue(boolean whiteMove, boolean progBias) {
+    float c = 2;
+    float k = 3;
+    float epsilon = 1;
     
-    // val + c * sqrt(ln(parent.simulations) / (epsilon + simulations))
-    return (whiteMove ? whiteWins : blackWins) + c * sqrt(log(parent.simulations) / (epsilon + simulations));
+    // wins + c * sqrt(2 * ln(parent.simulations) / (epsilon + simulations))
+    float value = (whiteMove ? whiteWins : blackWins) + c * sqrt(2 * log(1 + parent.simulations) / (epsilon + simulations));
+    if (progBias) {
+      // k * H(board) / (epsilon + simulations) 
+      value += (k * getBoardHeuristic(whiteMove) / (epsilon + simulations));
+    }
+    return value;
   }
   
-  TreeNode selectAndExpand(boolean whiteMove, int depth) {
+  float getBoardHeuristic(boolean whiteMove) {
+    // We want this to be positive if good for current player, but eval returns negative when good for black, so invert it
+    return ChessUtils.evaluationFunction(this.board.board) * (whiteMove ? 1 : -1);
+  }
+  
+  TreeNode selectAndExpand(boolean whiteMove, int depth, boolean progBias) {
     // If at max depth, select this node
     if (depth == 0) {
       return this;
     }
-    
     
     // If no children and not at max depth, EXPAND
     if (children.isEmpty()) {
@@ -121,20 +138,20 @@ class TreeNode {
     // traverse the tree choosing the "best" child (exploitation v exploration) until you hit max depth or a node with no children
     Collections.shuffle(this.children);
     TreeNode bestChild = this.children.get(0);
-    float bestValue = this.children.get(0).getValue(whiteMove);
+    float bestValue = this.children.get(0).getValue(whiteMove, progBias);
     
     for (TreeNode tn : children) {
-      float childVal = tn.getValue(whiteMove);
+      float childVal = tn.getValue(whiteMove, progBias);
       if (bestChild == null || bestValue < childVal) {
         bestChild = tn;
         bestValue = childVal;
       }
     }
-    return bestChild.selectAndExpand(whiteMove, depth - 1);  
+    return bestChild.selectAndExpand(whiteMove, depth - 1, progBias);  
   }
   
   void expandTree() {
-    // TODO expand the tree with all possible children
+    // expand the tree with all possible children
     ArrayList<ChessPiece[][]> childBoards = this.board.getPossibleMoves(isWhite);
     for (ChessPiece[][] cb : childBoards) {
       TreeNode child = new TreeNode(cb, !isWhite);
@@ -155,16 +172,16 @@ class TreeNode {
       // Get a random legal move
       ArrayList<ChessPiece[][]> legalMoves = curBoard.getPossibleMoves(curWhite);
       
-      // check if the game is over (no legal moves to playout, then determine if a "win" for the correct player)
+      // Check if the game is over (no legal moves to playout, then determine if a "win" for the correct player)
       // If end state, return the win pair
       if (legalMoves.isEmpty()) {
         // Hit a case of no legal moves
         if (whiteWins && curBoard.isCurrentBoardInCheck(false)) {
+          // Playout found checkmate win for white
           // We are tracking white wins and black is in checkmate
-          //System.out.println("Playout found checkmate win for white!");
           return new Pair(1, 0);
         } else if (!whiteWins && curBoard.isCurrentBoardInCheck(true)) {
-          //System.out.println("Playout found checkmate win for black!");
+          // Playout found checkmate win for black
           // We are tracking black wins and white is in checkmate
           return new Pair(0, 1);
         }
@@ -179,7 +196,6 @@ class TreeNode {
       moveCount++;
     }
     
-    //System.out.printf("Playout exceeded %d moves. Determined as a loss.\n", MAX_PLAYOUT_MOVES);
     return new Pair(0, 0);
   }
   
@@ -203,16 +219,6 @@ class TreeNode {
         mostSims = tn.simulations;
       }
     }
-    System.out.printf("Selected move with %d white wins and %d black wins with %d simulations\n", bestChild.whiteWins, bestChild.blackWins, bestChild.simulations);
     return bestChild.board;
   }
 }
-
-
-/*
-  Optimization idea:
-  1) When selecting a move, update the root of the MCTSChess object to be the selected node
-  2) This will take care of switching the color as color is tied to the nodes
-  3) When running playouts, return a pair of ints (white win, black win) and propogate up
-  4) Update eval function to care about white vs black as a param when called
-*/

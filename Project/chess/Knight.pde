@@ -8,7 +8,6 @@ class Knight extends ChessPiece {
     ChessPiece[][] boardWithoutPiece = ChessUtils.copyBoard(currentBoard);
     boardWithoutPiece[r][c] = null;
     
-    // TODO might be generating duplicate moves? Shouldn't matter, but may need to address for optimization
     for (int x = 1; x < 3; x++) {
       for (int y = 1; y < 3; y++) {
         if (x == y) {
