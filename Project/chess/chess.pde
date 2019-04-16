@@ -28,9 +28,17 @@ enum PlayerType {
   MCTS_PB // An AI that uses MCTS but includes progressive bias elements when performing selections
 }
 
-// TO CHANGE PLAYER TYPES, MODIFY THESE VALUES USING THE ENUMS
-PlayerType whitePlayer = PlayerType.MCTS;
-PlayerType blackPlayer = PlayerType.MINIMAX;
+// MODIFIABLE VALUES!!! Feel free to change these up to see how it affects the AI. IF something breaks, it's not on us :P
+PlayerType whitePlayer = PlayerType.MINIMAX;
+PlayerType blackPlayer = PlayerType.MCTS;
+int MINIMAX_DEPTH = 5;
+boolean MCTS_CACHE = false;
+int MAX_MCTS_DEPTH = 7; // Maximum depth for EXPLORATION of nodes
+// Maximum moves in a playout before determining it as "not a win", used as Chess can theoretically move back and forth a lot
+// in cases of players making random moves. Needed the search to have a guaranteed "end"
+int MAX_PLAYOUT_MOVES = 70;
+// time in MS to run MCTS exploration and simulation. After this time has passed, no NEW playouts will be performed, but the current playout will be allowed to finish
+int TIME_PER_MCTS_EXPLORATION = 10000; 
 
 // Game logic values
 ChessBoard gameBoard;
@@ -53,13 +61,9 @@ ArrayList<ChessPiece[][]> playerLegalMoves;
 ChessPiece promotionPiece;
 ArrayList<ChessPiece> promotionPieces;
 
-// MINIMAX values
-int MINIMAX_DEPTH = 5;
+// AI helper values
 int WIN_VAL = 100;
-
-// MCTS controller
 MCTSChess mcts;
-boolean MCTS_CACHE = false;
 
 // Keep track of the number of moves in a game
 int moveCount = 0;
@@ -68,6 +72,8 @@ void setup() {
   size(480, 540);
   frameRate(30);
   SampleBoards sampleBoards = new SampleBoards();
+  
+  // You can load the alternate boards here! Simply change which method from sampleBoards is called
   gameBoard = new ChessBoard(sampleBoards.getDefaultBoard());
   squareHighlights = new ArrayList<Pair>();
   

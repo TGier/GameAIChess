@@ -10,12 +10,6 @@
  * 2) When we explore from a node, we add all the valid children instead of just a single one. This is done as we wanted to avoid spending time determining if a randomly chosen new child was already considered
  */
 
- 
-// MCTS values used to help make the AI more playable and faster
-int MAX_MCTS_DEPTH = 7; // Maximum depth for EXPLORATION of nodes
-// Maximum moves in a playout before determining it as "not a win", used as Chess can theoretically move back and forth a lot in cases of players making random moves. Needed the search to have a guaranteed "end"
-int MAX_PLAYOUT_MOVES = 70;
-int TIME_PER_MCTS_EXPLORATION = 10000; // time in MS to run MCTS exploration and simulation. After this time has passed, no NEW playouts will be performed, but the current playout will be allowed to finish
 
  
 public class MCTSChess {
