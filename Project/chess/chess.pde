@@ -73,7 +73,7 @@ void setup() {
   frameRate(30);
   SampleBoards sampleBoards = new SampleBoards();
   
-  // You can load the alternate boards here! Simply change which method from sampleBoards is called
+  // MARK: You can load the alternate boards here! Simply change which method from sampleBoards is called
   gameBoard = new ChessBoard(sampleBoards.getDefaultBoard());
   squareHighlights = new ArrayList<Pair>();
   
